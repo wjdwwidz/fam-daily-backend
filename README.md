@@ -1,8 +1,10 @@
 # 우리끼리 가족앱 — 백엔드 (NestJS)
 
 `fam-daily-app`(React Native/Expo) 프론트엔드의 백엔드 API.
-**NestJS + Prisma + PostgreSQL + JWT** 기반. 1단계로 **인증(로그인/회원가입)**과
+**NestJS + TypeORM + PostgreSQL + JWT** 기반. 1단계로 **인증(로그인/회원가입)**과
 **가족 공간(생성·초대·참여·구성원)**을 제공합니다.
+
+> ORM은 **TypeORM**(JPA/Hibernate와 유사한 엔티티·데코레이터·리포지토리 방식)을 사용합니다.
 
 ## 빠른 시작
 
@@ -13,10 +15,7 @@ cp .env.example .env          # 필요 시 값 수정
 # 1) PostgreSQL 실행 (Docker)
 docker compose up -d
 
-# 2) DB 마이그레이션
-npx prisma migrate dev
-
-# 3) 개발 서버
+# 2) 개발 서버 (개발 모드는 synchronize:true 로 테이블 자동 생성)
 npm run start:dev             # http://localhost:3000/api
 ```
 
@@ -62,24 +61,29 @@ curl -X POST localhost:3000/api/families \
   -d '{"name":"서연이네 가족","nickname":"엄마"}'
 ```
 
-## 데이터 모델 (Prisma)
+## 데이터 모델 (TypeORM 엔티티)
 
 - **User** — 계정 (email, password(bcrypt), name)
 - **Family** — 가족 공간
 - **Membership** — User↔Family (가족 내 호칭 `nickname`, 역할 `OWNER/ADMIN/MEMBER`)
 - **Invite** — 초대 코드 (만료 가능)
 
+`@Entity` / `@Column` / `@ManyToOne` / `@OneToMany` 데코레이터로 정의하고,
+서비스에서 `@InjectRepository(...)` 리포지토리로 조회·저장합니다. (JPA·Spring Data 방식과 유사)
+
 ## 구조
 ```
 src/
   main.ts               부트스트랩 (전역 prefix /api, CORS, ValidationPipe)
-  app.module.ts
-  prisma/               PrismaService (전역 모듈)
+  app.module.ts         TypeOrmModule.forRootAsync (DB 연결)
+  entities/             User·Family·Membership·Invite 엔티티 + Role enum
   auth/                 회원가입·로그인·JWT 전략·가드·데코레이터
-  families/             가족 공간 생성·목록·초대·참여
-prisma/schema.prisma    데이터 모델
+  families/             가족 공간 생성·목록·초대·참여 (Repository 사용)
 docker-compose.yml      로컬 PostgreSQL
 ```
+
+## 운영 배포 시 주의
+- 개발은 `synchronize: true`(엔티티→테이블 자동)로 편하게, **운영에서는 끄고 마이그레이션** 사용 권장.
 
 ## 다음 단계
 - 카카오 OAuth 로그인

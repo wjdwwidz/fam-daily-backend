@@ -3,55 +3,55 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Role } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Family } from '../entities/family.entity';
+import { Membership } from '../entities/membership.entity';
+import { Invite } from '../entities/invite.entity';
+import { Role } from '../entities/role.enum';
 import { CreateFamilyDto, JoinFamilyDto } from './dto/family.dto';
 
 @Injectable()
 export class FamiliesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(Family) private readonly families: Repository<Family>,
+    @InjectRepository(Membership)
+    private readonly memberships: Repository<Membership>,
+    @InjectRepository(Invite) private readonly invites: Repository<Invite>,
+  ) {}
 
   // 가족 공간 생성 → 생성자는 OWNER 멤버십
   async create(userId: string, dto: CreateFamilyDto) {
-    const family = await this.prisma.family.create({
-      data: {
-        name: dto.name,
-        memberships: {
-          create: { userId, nickname: dto.nickname, role: Role.OWNER },
-        },
-      },
-      include: { _count: { select: { memberships: true } } },
-    });
-    return this.serialize(family, Role.OWNER);
+    const family = await this.families.save(
+      this.families.create({ name: dto.name }),
+    );
+    await this.memberships.save(
+      this.memberships.create({
+        nickname: dto.nickname,
+        role: Role.OWNER,
+        user: { id: userId } as any,
+        family: { id: family.id } as any,
+      }),
+    );
+    return { id: family.id, name: family.name, myRole: Role.OWNER, memberCount: 1 };
   }
 
-  // 내가 속한 가족 목록 (SpaceSelect 화면용)
+  // 내가 속한 가족 목록 (가족 선택 화면)
   async listMine(userId: string) {
-    const memberships = await this.prisma.membership.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        family: {
-          include: {
-            _count: { select: { memberships: true } },
-            memberships: {
-              take: 5,
-              orderBy: { createdAt: 'asc' },
-              include: { user: { select: { name: true } } },
-            },
-          },
-        },
-      },
+    const mems = await this.memberships.find({
+      where: { user: { id: userId } },
+      relations: { family: { memberships: { user: true } } },
+      order: { createdAt: 'ASC' },
     });
 
-    return memberships.map((m) => ({
+    return mems.map((m) => ({
       id: m.family.id,
       name: m.family.name,
       myRole: m.role,
       myNickname: m.nickname,
-      memberCount: m.family._count.memberships,
-      members: m.family.memberships.map((mm) => ({
+      memberCount: m.family.memberships.length,
+      members: m.family.memberships.slice(0, 5).map((mm) => ({
         nickname: mm.nickname,
         name: mm.user.name,
       })),
@@ -61,21 +61,17 @@ export class FamiliesService {
   // 가족 상세 + 구성원 (멤버만 접근)
   async getOne(userId: string, familyId: string) {
     await this.assertMember(userId, familyId);
-    const family = await this.prisma.family.findUnique({
+    const family = await this.families.findOne({
       where: { id: familyId },
-      include: {
-        memberships: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, name: true, email: true } } },
-        },
-      },
+      relations: { memberships: { user: true } },
+      order: { memberships: { createdAt: 'ASC' } },
     });
     if (!family) throw new NotFoundException('가족 공간을 찾을 수 없습니다.');
     return {
       id: family.id,
       name: family.name,
       members: family.memberships.map((m) => ({
-        userId: m.userId,
+        userId: m.user.id,
         name: m.user.name,
         nickname: m.nickname,
         role: m.role,
@@ -93,9 +89,9 @@ export class FamiliesService {
         ? new Date(Date.now() + days * 24 * 60 * 60 * 1000)
         : null;
 
-    const invite = await this.prisma.invite.create({
-      data: { code, familyId, expiresAt },
-    });
+    const invite = await this.invites.save(
+      this.invites.create({ code, family: { id: familyId } as any, expiresAt }),
+    );
     return {
       code: invite.code,
       link: `우리끼리.app/join/${invite.code}`,
@@ -105,47 +101,35 @@ export class FamiliesService {
 
   // 초대 코드로 참여
   async join(userId: string, dto: JoinFamilyDto) {
-    const invite = await this.prisma.invite.findUnique({
+    const invite = await this.invites.findOne({
       where: { code: dto.code },
-      include: { family: true },
+      relations: { family: true },
     });
     if (!invite) throw new NotFoundException('유효하지 않은 초대 코드입니다.');
     if (invite.expiresAt && invite.expiresAt < new Date())
       throw new ForbiddenException('만료된 초대 코드입니다.');
 
-    const existing = await this.prisma.membership.findUnique({
-      where: { userId_familyId: { userId, familyId: invite.familyId } },
+    const existing = await this.memberships.findOne({
+      where: { user: { id: userId }, family: { id: invite.family.id } },
     });
     if (existing) throw new ForbiddenException('이미 참여 중인 가족입니다.');
 
-    await this.prisma.membership.create({
-      data: {
-        userId,
-        familyId: invite.familyId,
+    await this.memberships.save(
+      this.memberships.create({
         nickname: dto.nickname,
         role: Role.MEMBER,
-      },
-    });
-    return this.getOne(userId, invite.familyId);
+        user: { id: userId } as any,
+        family: { id: invite.family.id } as any,
+      }),
+    );
+    return this.getOne(userId, invite.family.id);
   }
 
   private async assertMember(userId: string, familyId: string) {
-    const m = await this.prisma.membership.findUnique({
-      where: { userId_familyId: { userId, familyId } },
+    const m = await this.memberships.findOne({
+      where: { user: { id: userId }, family: { id: familyId } },
     });
     if (!m) throw new ForbiddenException('이 가족 공간의 구성원이 아닙니다.');
     return m;
-  }
-
-  private serialize(
-    family: { id: string; name: string; _count: { memberships: number } },
-    myRole: Role,
-  ) {
-    return {
-      id: family.id,
-      name: family.name,
-      myRole,
-      memberCount: family._count.memberships,
-    };
   }
 }
