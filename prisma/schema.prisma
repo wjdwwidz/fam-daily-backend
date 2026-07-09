@@ -1,0 +1,59 @@
+// 우리끼리 가족앱 백엔드 스키마
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+}
+
+// 가족 공간
+model Family {
+  id          String       @id @default(uuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  invites     Invite[]
+}
+
+// 유저 ↔ 가족 (가족 내 호칭·역할)
+model Membership {
+  id        String   @id @default(uuid())
+  nickname  String // 가족 내 호칭 (엄마, 이모, 삼촌 …)
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  userId   String
+  familyId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, familyId])
+}
+
+// 초대 코드/링크
+model Invite {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  familyId String
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+}
