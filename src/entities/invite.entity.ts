@@ -5,7 +5,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Family } from './family.entity';
+import { Group } from './group.entity';
 
 // 초대 코드/링크
 @Entity()
@@ -22,6 +22,6 @@ export class Invite {
   @Column({ type: 'timestamptz', nullable: true })
   expiresAt: Date | null;
 
-  @ManyToOne(() => Family, (f) => f.invites, { onDelete: 'CASCADE' })
-  family: Family;
+  @ManyToOne(() => Group, (g) => g.invites, { onDelete: 'CASCADE' })
+  group: Group;
 }

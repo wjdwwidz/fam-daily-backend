@@ -8,9 +8,9 @@ import {
 import { Membership } from './membership.entity';
 import { Invite } from './invite.entity';
 
-// 가족 공간
+// 그룹 공간
 @Entity()
-export class Family {
+export class Group {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -20,9 +20,9 @@ export class Family {
   @CreateDateColumn()
   createdAt: Date;
 
-  @OneToMany(() => Membership, (m) => m.family)
+  @OneToMany(() => Membership, (m) => m.group)
   memberships: Membership[];
 
-  @OneToMany(() => Invite, (i) => i.family)
+  @OneToMany(() => Invite, (i) => i.group)
   invites: Invite[];
 }
