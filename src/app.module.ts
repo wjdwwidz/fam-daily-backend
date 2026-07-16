@@ -3,11 +3,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { GroupsModule } from './groups/groups.module';
+import { WordsModule } from './words/words.module';
+import { QnaModule } from './qna/qna.module';
 import { AppController } from './app.controller';
 import { User } from './entities/user.entity';
 import { Group } from './entities/group.entity';
 import { Membership } from './entities/membership.entity';
 import { Invite } from './entities/invite.entity';
+import { Word } from './entities/word.entity';
+import { Question } from './entities/question.entity';
+import { Answer } from './entities/answer.entity';
 
 @Module({
   imports: [
@@ -17,12 +22,14 @@ import { Invite } from './entities/invite.entity';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [User, Group, Membership, Invite],
+        entities: [User, Group, Membership, Invite, Word, Question, Answer],
         synchronize: true, // 개발용: 엔티티 기준으로 테이블 자동 생성 (운영은 마이그레이션 사용)
       }),
     }),
     AuthModule,
     GroupsModule,
+    WordsModule,
+    QnaModule,
   ],
   controllers: [AppController],
 })
