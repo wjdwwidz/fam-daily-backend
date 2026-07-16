@@ -64,12 +64,14 @@ export class AuthService {
   }
 
   // 1) 카카오 로그인 화면으로 보낼 authorize URL 생성
-  buildKakaoAuthUrl() {
+  //    redirect: 로그인 성공 후 앱/프론트로 돌아갈 주소 → state 로 실어보내 콜백에서 사용
+  buildKakaoAuthUrl(redirect?: string) {
     const params = new URLSearchParams({
       client_id: this.config.getOrThrow<string>('KAKAO_REST_API_KEY'),
       redirect_uri: this.config.getOrThrow<string>('KAKAO_REDIRECT_URI'),
       response_type: 'code',
     });
+    if (redirect) params.set('state', redirect);
     return `${KAKAO_AUTHORIZE_URL}?${params.toString()}`;
   }
 

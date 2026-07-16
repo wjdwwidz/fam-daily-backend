@@ -39,20 +39,26 @@ export class AuthController {
 
   @Get('kakao')
   @ApiOperation({ summary: '카카오 로그인 시작 (카카오 인증 화면으로 리다이렉트)' })
-  kakaoLogin(@Res() res: Response) {
-    return res.redirect(this.auth.buildKakaoAuthUrl());
+  kakaoLogin(@Query('redirect') redirect: string, @Res() res: Response) {
+    // redirect: 로그인 성공 후 돌아갈 주소 (앱 딥링크 등). 없으면 기본 프론트로.
+    return res.redirect(this.auth.buildKakaoAuthUrl(redirect));
   }
 
   @Get('kakao/callback')
   @ApiOperation({
-    summary: '카카오 로그인 콜백 (인가 코드 처리 후 프론트로 리다이렉트)',
+    summary: '카카오 로그인 콜백 (인가 코드 처리 후 프론트/앱으로 리다이렉트)',
   })
-  async kakaoCallback(@Query('code') code: string, @Res() res: Response) {
+  async kakaoCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
     const { accessToken } = await this.auth.loginWithKakao(code);
-    const frontend = this.config.getOrThrow<string>('FRONTEND_REDIRECT_URL');
-    const url = new URL(frontend);
-    url.searchParams.set('token', accessToken);
-    return res.redirect(url.toString());
+    // state 로 전달된 앱 딥링크(있으면)로, 없으면 기본 프론트 주소로 토큰 붙여 리다이렉트
+    const base = state || this.config.getOrThrow<string>('FRONTEND_REDIRECT_URL');
+    const sep = base.includes('?') ? '&' : '?';
+    const url = `${base}${sep}token=${encodeURIComponent(accessToken)}`;
+    return res.redirect(url);
   }
 
   @Get('me')
