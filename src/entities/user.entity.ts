@@ -15,15 +15,11 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  // 소셜 로그인 유저는 비밀번호가 없으므로 nullable
-  @Column({ type: 'varchar', nullable: true })
-  password: string | null;
-
   @Column()
   name: string;
 
-  // 'local' | 'kakao' — 가입 경로
-  @Column({ type: 'varchar', default: 'local' })
+  // 소셜 가입 경로: 'kakao' (추후 'google' 등 확장)
+  @Column({ type: 'varchar', default: 'kakao' })
   provider: string;
 
   // 소셜 제공자 회원번호 (local 유저는 null)

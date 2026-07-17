@@ -23,6 +23,16 @@ export class Membership {
   @Column({ type: 'enum', enum: Role, default: Role.MEMBER })
   role: Role;
 
+  // 오늘의 한마디 (그룹 내 나의 현재 상태 메시지)
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  mood: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  moodEmoji: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  moodAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Group } from '../entities/group.entity';
 import { Role } from '../entities/role.enum';
-import { CreateGroupDto, JoinGroupDto } from './dto/group.dto';
+import { CreateGroupDto, JoinGroupDto, SetMoodDto } from './dto/group.dto';
 import { MembershipsService } from './memberships.service';
 import { InvitesService } from './invites.service';
 
@@ -66,8 +66,32 @@ export class GroupsService {
         name: m.user.name,
         nickname: m.nickname,
         role: m.role,
+        mood: m.mood,
+        moodEmoji: m.moodEmoji,
+        moodAt: m.moodAt,
       })),
     };
+  }
+
+  // 오늘의 한마디(무드) 설정 (멤버 검사는 GroupMemberGuard가 담당) → 갱신된 그룹 상세 반환
+  async setMyMood(userId: string, groupId: string, dto: SetMoodDto) {
+    await this.memberships.setMood(userId, groupId, dto.text, dto.emoji);
+    return this.getOne(groupId);
+  }
+
+  // 그룹(가족) 이름 수정 — 방장(OWNER)만 → 갱신된 그룹 상세 반환
+  async renameGroup(userId: string, groupId: string, name: string) {
+    const m = await this.memberships.assertMember(userId, groupId);
+    if (m.role !== Role.OWNER)
+      throw new ForbiddenException('그룹 이름은 방장만 수정할 수 있습니다.');
+    await this.groups.update({ id: groupId }, { name });
+    return this.getOne(groupId);
+  }
+
+  // 내 호칭 수정 (멤버 검사는 GroupMemberGuard가 담당) → 갱신된 그룹 상세 반환
+  async updateMyNickname(userId: string, groupId: string, nickname: string) {
+    await this.memberships.updateNickname(userId, groupId, nickname);
+    return this.getOne(groupId);
   }
 
   // 초대 코드 생성 (멤버 검사는 GroupMemberGuard가 담당)

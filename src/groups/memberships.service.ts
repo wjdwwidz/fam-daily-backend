@@ -46,6 +46,22 @@ export class MembershipsService {
     );
   }
 
+  // 내 호칭 수정 (그룹 멤버여야 함)
+  async updateNickname(userId: string, groupId: string, nickname: string) {
+    const m = await this.assertMember(userId, groupId);
+    m.nickname = nickname;
+    return this.memberships.save(m);
+  }
+
+  // 오늘의 한마디(무드) 설정 (그룹 멤버여야 함)
+  async setMood(userId: string, groupId: string, text: string, emoji?: string) {
+    const m = await this.assertMember(userId, groupId);
+    m.mood = text;
+    m.moodEmoji = emoji ?? null;
+    m.moodAt = new Date();
+    return this.memberships.save(m);
+  }
+
   // 내가 속한 그룹 목록용 — 멤버십 + 그룹(+구성원) 로드
   async listForUser(userId: string) {
     return this.memberships.find({
