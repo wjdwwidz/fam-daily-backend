@@ -79,17 +79,10 @@ export class QnaService {
     const q = await this.questions.findOne({ where: { id: questionId } });
     if (!q) throw new NotFoundException('질문을 찾을 수 없습니다.');
     const m = await this.assertMember(userId, q.groupId);
-    const existing = await this.answers.findOne({
-      where: { questionId, authorId: m.id },
-    });
-    if (existing) {
-      existing.text = dto.text;
-      await this.answers.save(existing);
-    } else {
-      await this.answers.save(
-        this.answers.create({ text: dto.text, questionId, authorId: m.id }),
-      );
-    }
+    // 댓글처럼 매번 새 답변으로 추가 (덮어쓰지 않음)
+    await this.answers.save(
+      this.answers.create({ text: dto.text, questionId, authorId: m.id }),
+    );
     return this.getQuestion(userId, questionId);
   }
 

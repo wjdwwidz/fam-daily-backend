@@ -4,15 +4,13 @@ import {
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
-  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { Question } from './question.entity';
 import { Membership } from './membership.entity';
 
-// 문답 답변 — 한 질문에 대해 멤버당 하나 (다시 쓰면 수정)
+// 문답 답변 — 댓글처럼 한 질문에 여러 개 달림 (멤버당 여러 답변 가능)
 @Entity()
-@Unique(['question', 'author'])
 export class Answer {
   @PrimaryGeneratedColumn('uuid')
   id: string;
