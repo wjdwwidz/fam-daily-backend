@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -51,12 +52,22 @@ export class QnaController {
   }
 
   @Post('questions/:questionId/answers')
-  @ApiOperation({ summary: '내 답변 남기기 (멤버당 하나, 다시 쓰면 수정)' })
+  @ApiOperation({ summary: '답변 남기기 (댓글처럼 여러 개 누적)' })
   answer(
     @CurrentUser() user: AuthUser,
     @Param('questionId') questionId: string,
     @Body() dto: CreateAnswerDto,
   ) {
     return this.qna.answer(user.id, questionId, dto);
+  }
+
+  @Patch('answers/:answerId')
+  @ApiOperation({ summary: '내 답변 수정 (작성자만)' })
+  editAnswer(
+    @CurrentUser() user: AuthUser,
+    @Param('answerId') answerId: string,
+    @Body() dto: CreateAnswerDto,
+  ) {
+    return this.qna.editAnswer(user.id, answerId, dto);
   }
 }

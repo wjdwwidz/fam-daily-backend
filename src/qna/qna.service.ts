@@ -86,6 +86,20 @@ export class QnaService {
     return this.getQuestion(userId, questionId);
   }
 
+  // 답변 수정 (작성자 본인만)
+  async editAnswer(userId: string, answerId: string, dto: CreateAnswerDto) {
+    const a = await this.answers.findOne({
+      where: { id: answerId },
+      relations: { author: { user: true } },
+    });
+    if (!a) throw new NotFoundException('답변을 찾을 수 없습니다.');
+    if (a.author?.user?.id !== userId)
+      throw new ForbiddenException('본인 답변만 수정할 수 있습니다.');
+    a.text = dto.text;
+    await this.answers.save(a);
+    return this.getQuestion(userId, a.questionId);
+  }
+
   // --- helpers ---
 
   private orderedWithAnswers(groupId: string) {
@@ -109,7 +123,9 @@ export class QnaService {
   }
 
   private authorJson(m: Membership | null) {
-    return m ? { nickname: m.nickname, name: m.user?.name ?? '' } : null;
+    return m
+      ? { userId: m.user?.id ?? null, nickname: m.nickname, name: m.user?.name ?? '' }
+      : null;
   }
 
   private answerJson(a: Answer) {
