@@ -24,6 +24,11 @@ import { Answer } from './entities/answer.entity';
         url: config.get<string>('DATABASE_URL'),
         entities: [User, Group, Membership, Invite, Word, Question, Answer],
         synchronize: true, // 개발용: 엔티티 기준으로 테이블 자동 생성 (운영은 마이그레이션 사용)
+        // 클라우드 Postgres(Supabase 등)는 SSL 필요 → 배포 시 DB_SSL=true. 로컬 Docker는 미설정(=false)
+        ssl:
+          config.get<string>('DB_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
     }),
     AuthModule,
