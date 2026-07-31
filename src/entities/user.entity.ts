@@ -18,6 +18,10 @@ export class User {
   @Column()
   name: string;
 
+  // 프로필 사진 URL (Supabase Storage). 없으면 색+이니셜 아바타
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl: string | null;
+
   // 소셜 가입 경로: 'kakao' (추후 'google' 등 확장)
   @Column({ type: 'varchar', default: 'kakao' })
   provider: string;

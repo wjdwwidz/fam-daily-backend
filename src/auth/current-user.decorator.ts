@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  photoUrl?: string | null;
 }
 
 export const CurrentUser = createParamDecorator(

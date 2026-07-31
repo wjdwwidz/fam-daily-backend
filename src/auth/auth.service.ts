@@ -32,9 +32,20 @@ export class AuthService {
 
   // 내 프로필(이름) 수정
   async updateMe(userId: string, dto: UpdateMeDto) {
-    await this.users.update({ id: userId }, { name: dto.name });
+    await this.users.update(
+      { id: userId },
+      {
+        name: dto.name,
+        ...(dto.photoUrl !== undefined ? { photoUrl: dto.photoUrl } : {}),
+      },
+    );
     const user = await this.users.findOneOrFail({ where: { id: userId } });
-    return { id: user.id, email: user.email, name: user.name };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      photoUrl: user.photoUrl,
+    };
   }
 
   // 1) 카카오 로그인 화면으로 보낼 authorize URL 생성
