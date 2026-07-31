@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { GroupsModule } from './groups/groups.module';
 import { WordsModule } from './words/words.module';
 import { QnaModule } from './qna/qna.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { AppController } from './app.controller';
 import { User } from './entities/user.entity';
 import { Group } from './entities/group.entity';
@@ -53,6 +54,7 @@ import { Answer } from './entities/answer.entity';
     GroupsModule,
     WordsModule,
     QnaModule,
+    UploadsModule,
   ],
   controllers: [AppController],
 })
