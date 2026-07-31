@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -34,9 +35,12 @@ export class UploadsController {
         cb(null, /^image\//.test(file.mimetype)), // 이미지만
     }),
   )
-  async upload(@UploadedFile() file: Express.Multer.File) {
+  async upload(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('folder') folder?: string, // 예: ?folder=words → words/ 폴더에 저장
+  ) {
     if (!file) throw new BadRequestException('이미지 파일이 없습니다.');
-    const url = await this.storage.upload(file);
+    const url = await this.storage.upload(file, folder);
     return { url };
   }
 }

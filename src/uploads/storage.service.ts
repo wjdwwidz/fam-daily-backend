@@ -27,15 +27,20 @@ export class StorageService {
     }
   }
 
-  // 파일 업로드 후 public URL 반환
-  async upload(file: Express.Multer.File): Promise<string> {
+  // 파일 업로드 후 public URL 반환. folder 로 버킷 내 경로(prefix) 정리 (예: 'words')
+  async upload(file: Express.Multer.File, folder?: string): Promise<string> {
     if (!this.client) {
       throw new InternalServerErrorException(
         '스토리지가 설정되지 않았습니다 (SUPABASE_URL/SUPABASE_SERVICE_KEY 필요).',
       );
     }
+    // 경로 주입 방지: 영문/숫자/_/-/ 만 허용, 앞뒤 슬래시 제거
+    const safeFolder = (folder || '')
+      .replace(/[^a-zA-Z0-9/_-]/g, '')
+      .replace(/^\/+|\/+$/g, '');
     const ext = extname(file.originalname || '') || '.jpg';
-    const path = `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`;
+    const file_name = `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`;
+    const path = safeFolder ? `${safeFolder}/${file_name}` : file_name;
 
     const { error } = await this.client.storage
       .from(this.bucket)
