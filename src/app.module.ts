@@ -32,6 +32,10 @@ import { Answer } from './entities/answer.entity';
         };
         // DB_HOST가 있으면 필드별 접속(특수문자 비번 URL 인코딩 문제 회피), 없으면 DATABASE_URL 사용
         const host = config.get<string>('DB_HOST');
+        // [진단] 어느 DB로 접속 시도하는지 (비번 제외) — Railway 로그에서 확인용
+        console.log(
+          `[DB] mode=${host ? 'fields' : 'url'} host=${host ?? '(none→URL fallback)'} port=${config.get<string>('DB_PORT') ?? '(default)'} ssl=${config.get<string>('DB_SSL')}`,
+        );
         if (host) {
           return {
             ...common,
