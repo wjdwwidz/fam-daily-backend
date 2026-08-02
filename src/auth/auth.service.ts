@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { StorageService } from '../uploads/storage.service';
 
 const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
@@ -24,6 +25,7 @@ export class AuthService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   private sign(user: { id: string; email: string }) {
@@ -32,6 +34,15 @@ export class AuthService {
 
   // 내 프로필(이름) 수정
   async updateMe(userId: string, dto: UpdateMeDto) {
+    // 사진을 바꾸는 요청이면, 교체 후 지울 수 있게 예전 URL 을 먼저 확보
+    let oldPhotoUrl: string | null = null;
+    if (dto.photoUrl !== undefined) {
+      const current = await this.users.findOne({
+        where: { id: userId },
+        select: { photoUrl: true },
+      });
+      oldPhotoUrl = current?.photoUrl ?? null;
+    }
     await this.users.update(
       { id: userId },
       {
@@ -39,6 +50,14 @@ export class AuthService {
         ...(dto.photoUrl !== undefined ? { photoUrl: dto.photoUrl } : {}),
       },
     );
+    // 사진이 실제로 바뀌었으면 예전 파일은 Storage 에서 제거 (기록 안 남김)
+    if (
+      dto.photoUrl !== undefined &&
+      oldPhotoUrl &&
+      oldPhotoUrl !== dto.photoUrl
+    ) {
+      await this.storage.removeByUrl(oldPhotoUrl);
+    }
     const user = await this.users.findOneOrFail({ where: { id: userId } });
     return {
       id: user.id,

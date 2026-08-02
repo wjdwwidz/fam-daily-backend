@@ -53,4 +53,22 @@ export class StorageService {
     const { data } = this.client.storage.from(this.bucket).getPublicUrl(path);
     return data.publicUrl;
   }
+
+  // public URL 에서 이 버킷의 파일 경로를 뽑아 삭제. 우리 버킷 파일이 아니면 무시.
+  // (프로필/사전 사진 교체 시 예전 파일이 orphan 으로 쌓이지 않도록)
+  async removeByUrl(publicUrl?: string | null): Promise<void> {
+    if (!this.client || !publicUrl) return;
+    const marker = `/object/public/${this.bucket}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return; // 우리 버킷 URL 이 아니면 건드리지 않음
+    const path = decodeURIComponent(
+      publicUrl.slice(idx + marker.length).split('?')[0],
+    );
+    if (!path) return;
+    const { error } = await this.client.storage.from(this.bucket).remove([path]);
+    if (error) {
+      // 삭제 실패는 치명적이지 않음 (본 요청은 이미 성공) → 경고만
+      this.logger.warn(`이전 파일 삭제 실패(무시): ${error.message}`);
+    }
+  }
 }
