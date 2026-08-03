@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -11,16 +11,33 @@ const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 const KAKAO_USER_URL = 'https://kapi.kakao.com/v2/user/me';
 
+// 카카오가 이름을 안 내려줄 때만 쓰는 임시 이름. 나중 로그인에서 실제 닉네임으로 교체된다.
+const KAKAO_FALLBACK_NAME = '카카오 사용자';
+
 interface KakaoUser {
   id: number;
   kakao_account?: {
     email?: string;
-    profile?: { nickname?: string };
+    profile?: {
+      nickname?: string;
+      profile_image_url?: string;
+      thumbnail_image_url?: string;
+      is_default_image?: boolean;
+    };
+  };
+  // 구버전 필드. 동의항목 설정에 따라 kakao_account 대신 여기만 채워지는 경우가 있다.
+  properties?: {
+    nickname?: string;
+    profile_image?: string;
+    thumbnail_image?: string;
   };
 }
 
 @Injectable()
 export class AuthService {
+  // [임시 진단] 카카오 닉네임 미수신 디버깅용 — 확인 후 제거
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly jwt: JwtService,
@@ -75,6 +92,11 @@ export class AuthService {
       redirect_uri: this.config.getOrThrow<string>('KAKAO_REDIRECT_URI'),
       response_type: 'code',
     });
+    // 동의항목(scope)을 명시해야 카카오가 닉네임/프로필사진을 내려준다.
+    // 단, 콘솔(카카오 로그인 > 동의항목)에서 활성화한 항목만 요청 가능 — 아니면 KOE205 로 로그인이 막힌다.
+    // 프로필 사진까지 받으려면 KAKAO_SCOPE=profile_nickname,profile_image 로 설정.
+    const scope = this.config.get<string>('KAKAO_SCOPE') ?? 'profile_nickname';
+    if (scope) params.set('scope', scope);
     if (redirect) params.set('state', redirect);
     return `${KAKAO_AUTHORIZE_URL}?${params.toString()}`;
   }
@@ -85,6 +107,11 @@ export class AuthService {
     const kakaoUser = await this.fetchKakaoUser(kakaoAccessToken);
 
     const providerId = String(kakaoUser.id);
+    const { nickname, photoUrl } = this.extractKakaoProfile(kakaoUser);
+    // [임시 진단]
+    this.logger.log(
+      `[kakao] 로그인 시도 providerId=${providerId} nickname=${nickname ?? 'null'} photo=${photoUrl ? 'yes' : 'no'}`,
+    );
     let user = await this.users.findOne({
       where: { provider: 'kakao', providerId },
     });
@@ -92,19 +119,48 @@ export class AuthService {
     if (!user) {
       const email =
         kakaoUser.kakao_account?.email ?? `kakao_${providerId}@kakao.local`;
-      const name = kakaoUser.kakao_account?.profile?.nickname ?? '카카오 사용자';
       user = await this.users.save(
         this.users.create({
           email,
-          name,
+          name: nickname ?? KAKAO_FALLBACK_NAME,
+          photoUrl,
           provider: 'kakao',
           providerId,
         }),
       );
+    } else {
+      // 기존 유저: 앱에서 직접 고친 이름/사진은 그대로 두고,
+      // 비어 있거나 아직 임시 이름인 경우에만 카카오 정보로 채운다.
+      const patch: Partial<User> = {};
+      if (nickname && (!user.name || user.name === KAKAO_FALLBACK_NAME)) {
+        patch.name = nickname;
+      }
+      if (photoUrl && !user.photoUrl) patch.photoUrl = photoUrl;
+      if (Object.keys(patch).length > 0) {
+        Object.assign(user, patch);
+        await this.users.save(user);
+      }
     }
 
     const safe = { id: user.id, email: user.email, name: user.name };
-    return { user: safe, accessToken: this.sign(safe) };
+    return {
+      user: { ...safe, photoUrl: user.photoUrl },
+      accessToken: this.sign(safe),
+    };
+  }
+
+  // 카카오 응답에서 닉네임/프로필사진 추출.
+  // kakao_account.profile 이 비면 구버전 properties 로 폴백.
+  private extractKakaoProfile(kakaoUser: KakaoUser) {
+    const profile = kakaoUser.kakao_account?.profile;
+    const legacy = kakaoUser.properties;
+    const nickname =
+      profile?.nickname?.trim() || legacy?.nickname?.trim() || null;
+    // 카카오 기본 이미지면 가져오지 않는다 (앱의 색+이니셜 아바타가 낫다)
+    const photoUrl = profile?.is_default_image
+      ? null
+      : profile?.profile_image_url || legacy?.profile_image || null;
+    return { nickname, photoUrl };
   }
 
   // 인가 코드를 카카오 access token으로 교환
@@ -141,7 +197,16 @@ export class AuthService {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok)
-      throw new UnauthorizedException('카카오 사용자 정보 조회에 실패했습니다.');
-    return (await res.json()) as KakaoUser;
+      throw new UnauthorizedException(
+        '카카오 사용자 정보 조회에 실패했습니다.',
+      );
+    const data = (await res.json()) as KakaoUser;
+    // [임시 진단] 카카오가 실제로 내려주는 프로필 필드 확인
+    this.logger.log(
+      `[kakao] /v2/user/me profile=${JSON.stringify(
+        data.kakao_account?.profile ?? null,
+      )} properties=${JSON.stringify(data.properties ?? null)}`,
+    );
+    return data;
   }
 }
