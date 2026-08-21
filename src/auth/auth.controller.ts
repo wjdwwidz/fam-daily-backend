@@ -1,6 +1,24 @@
-import { Body, Controller, Get, Patch, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -71,5 +89,27 @@ export class AuthController {
   @ApiOperation({ summary: '내 프로필(이름) 수정' })
   updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
     return this.auth.updateMe(user.id, dto);
+  }
+
+  // 업로드와 DB 기록을 한 요청으로 묶는다 (고아 파일 방지). 자세한 이유는 서비스에.
+  @Post('me/photo')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 프로필 사진 교체 (multipart, field=file) — 업로드+저장을 한 번에',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 8 * 1024 * 1024 }, // 8MB 제한
+      fileFilter: (_req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+    }),
+  )
+  updatePhoto(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('이미지 파일이 없습니다.');
+    return this.auth.updatePhoto(user.id, file);
   }
 }

@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -73,6 +78,42 @@ export class AuthService {
       oldPhotoUrl &&
       oldPhotoUrl !== dto.photoUrl
     ) {
+      await this.storage.removeByUrl(oldPhotoUrl);
+    }
+    const user = await this.users.findOneOrFail({ where: { id: userId } });
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      photoUrl: user.photoUrl,
+    };
+  }
+
+  // 프로필 사진 교체 — 업로드와 DB 기록을 한 요청 안에서 끝낸다.
+  //
+  // 클라이언트가 "업로드 → 그 URL 로 저장" 두 번 호출하면, 업로드만 성공하고
+  // 저장을 안 하거나 실패할 때 아무도 참조하지 않는 파일이 버킷에 남는다.
+  // 여기서는 DB 기록이 실패하면 방금 올린 파일을 되돌려 그 구멍을 막는다.
+  async updatePhoto(userId: string, file: Express.Multer.File) {
+    const current = await this.users.findOne({
+      where: { id: userId },
+      select: { photoUrl: true },
+    });
+    if (!current) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    const oldPhotoUrl = current.photoUrl ?? null;
+
+    const url = await this.storage.upload(file, 'profiles');
+    try {
+      const res = await this.users.update({ id: userId }, { photoUrl: url });
+      if (!res.affected) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    } catch (e) {
+      // DB 기록 실패 → 방금 올린 파일은 아무도 가리키지 않는다. 되돌린다.
+      await this.storage.removeByUrl(url);
+      throw e;
+    }
+
+    // 여기서부터는 새 사진이 DB 에 확정됐다. 예전 파일은 지워도 안전하다.
+    if (oldPhotoUrl && oldPhotoUrl !== url) {
       await this.storage.removeByUrl(oldPhotoUrl);
     }
     const user = await this.users.findOneOrFail({ where: { id: userId } });
