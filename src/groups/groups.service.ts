@@ -44,8 +44,10 @@ export class GroupsService {
       myNickname: m.nickname,
       memberCount: m.group.memberships.length,
       members: m.group.memberships.slice(0, 5).map((mm) => ({
+        userId: mm.user.id,
         nickname: mm.nickname,
         name: mm.user.name,
+        photoUrl: mm.user.photoUrl,
       })),
     }));
   }
@@ -65,6 +67,7 @@ export class GroupsService {
         userId: m.user.id,
         name: m.user.name,
         nickname: m.nickname,
+        photoUrl: m.user.photoUrl,
         role: m.role,
         mood: m.mood,
         moodEmoji: m.moodEmoji,

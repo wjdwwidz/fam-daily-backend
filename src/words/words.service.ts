@@ -95,7 +95,12 @@ export class WordsService {
       photoUrl: w.photoUrl,
       createdAt: w.createdAt,
       author: w.author
-        ? { nickname: w.author.nickname, name: w.author.user?.name ?? '' }
+        ? {
+            userId: w.author.user?.id ?? null,
+            nickname: w.author.nickname,
+            name: w.author.user?.name ?? '',
+            photoUrl: w.author.user?.photoUrl ?? null,
+          }
         : null,
     };
   }

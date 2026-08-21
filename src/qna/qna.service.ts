@@ -124,7 +124,12 @@ export class QnaService {
 
   private authorJson(m: Membership | null) {
     return m
-      ? { userId: m.user?.id ?? null, nickname: m.nickname, name: m.user?.name ?? '' }
+      ? {
+          userId: m.user?.id ?? null,
+          nickname: m.nickname,
+          name: m.user?.name ?? '',
+          photoUrl: m.user?.photoUrl ?? null,
+        }
       : null;
   }
 
