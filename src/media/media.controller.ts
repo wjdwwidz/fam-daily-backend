@@ -6,11 +6,11 @@ import {
   Get,
   Param,
   Post,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -20,7 +20,11 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { MediaService } from './media.service';
-import { CreateMediaDto } from './dto/media.dto';
+
+// 한 글에 담을 수 있는 최대 개수와 개당 크기.
+// 메모리 버퍼링이라 이 둘의 곱이 곧 최악의 순간 메모리 사용량이다.
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
 @ApiTags('media')
 @ApiBearerAuth()
@@ -36,36 +40,29 @@ export class MediaController {
   }
 
   // 업로드와 DB 기록을 한 요청으로 (고아 파일 방지). 자세한 이유는 서비스에.
+  //
+  // 파일은 메모리에 버퍼링된다(multer 기본). 영상은 사진보다 훨씬 크므로
+  // 장수(MAX_FILES)와 개당 크기(MAX_FILE_SIZE)를 함께 제한한다.
   @Post('groups/:groupId/media')
   @ApiOperation({
-    summary: '일상 사진 올리기 (multipart, field=file) — 업로드+등록을 한 번에',
+    summary: '일상 올리기 (multipart, field=files) — 사진·영상 여러 개를 글 하나로',
   })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 8 * 1024 * 1024 }, // 8MB 제한
-      fileFilter: (_req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+    FilesInterceptor('files', MAX_FILES, {
+      limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
+      fileFilter: (_req, file, cb) =>
+        cb(null, /^(image|video)\//.test(file.mimetype)),
     }),
   )
   upload(
     @CurrentUser() user: AuthUser,
     @Param('groupId') groupId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body('caption') caption?: string,
   ) {
-    if (!file) throw new BadRequestException('이미지 파일이 없습니다.');
-    return this.media.createWithFile(user.id, groupId, file, caption ?? '');
-  }
-
-  // 이미 업로드된 URL 로 등록하는 경로 (업로드를 따로 한 경우)
-  @Post('groups/:groupId/media/by-url')
-  @ApiOperation({ summary: '일상 사진 등록 (이미 업로드된 URL 로)' })
-  create(
-    @CurrentUser() user: AuthUser,
-    @Param('groupId') groupId: string,
-    @Body() dto: CreateMediaDto,
-  ) {
-    return this.media.create(user.id, groupId, dto);
+    if (!files?.length) throw new BadRequestException('사진이나 영상을 선택해주세요.');
+    return this.media.createWithFiles(user.id, groupId, files, caption ?? '');
   }
 
   @Get('media/:mediaId')

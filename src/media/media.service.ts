@@ -5,10 +5,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Media } from '../entities/media.entity';
+import { Media, MediaItem } from '../entities/media.entity';
 import { Membership } from '../entities/membership.entity';
 import { StorageService } from '../uploads/storage.service';
-import { CreateMediaDto } from './dto/media.dto';
 
 @Injectable()
 export class MediaService {
@@ -30,46 +29,39 @@ export class MediaService {
     return rows.map((m) => this.serialize(m));
   }
 
-  // 사진 업로드 + 기록을 한 요청으로 묶는다.
+  // 업로드 + 기록을 한 요청으로 묶는다.
   // 나눠 부르면 업로드만 성공했을 때 아무도 참조하지 않는 파일이 버킷에 남는다.
-  // DB 기록이 실패하면 방금 올린 파일을 되돌린다.
-  async createWithFile(
+  // 중간에 실패하면 그때까지 올린 파일을 전부 되돌린다.
+  async createWithFiles(
     userId: string,
     groupId: string,
-    file: Express.Multer.File,
+    files: Express.Multer.File[],
     caption: string,
   ) {
     const membership = await this.assertMember(userId, groupId);
-    const photoUrl = await this.storage.upload(file, 'media');
-    let saved: Media;
+    const items: MediaItem[] = [];
     try {
-      saved = await this.media.save(
+      for (const file of files) {
+        const url = await this.storage.upload(file, 'media');
+        items.push({
+          url,
+          type: /^video\//.test(file.mimetype) ? 'video' : 'image',
+        });
+      }
+      const saved = await this.media.save(
         this.media.create({
-          photoUrl,
+          items,
           caption: caption ?? '',
           groupId,
           authorId: membership.id,
         }),
       );
+      return this.getOne(userId, saved.id);
     } catch (e) {
-      await this.storage.removeByUrl(photoUrl);
+      // 업로드했지만 글로 남지 못한 파일들을 정리한다
+      for (const it of items) await this.storage.removeByUrl(it.url);
       throw e;
     }
-    return this.getOne(userId, saved.id);
-  }
-
-  // 이미 업로드된 URL 로 등록 (업로드를 따로 한 경우)
-  async create(userId: string, groupId: string, dto: CreateMediaDto) {
-    const membership = await this.assertMember(userId, groupId);
-    const saved = await this.media.save(
-      this.media.create({
-        photoUrl: dto.photoUrl,
-        caption: dto.caption ?? '',
-        groupId,
-        authorId: membership.id,
-      }),
-    );
-    return this.getOne(userId, saved.id);
   }
 
   async getOne(userId: string, mediaId: string) {
@@ -82,7 +74,7 @@ export class MediaService {
     return this.serialize(row);
   }
 
-  // 올린 본인만 삭제할 수 있다. 사진 파일도 함께 정리한다.
+  // 올린 본인만 삭제할 수 있다. 사진·영상 파일도 함께 정리한다.
   async remove(userId: string, mediaId: string) {
     const row = await this.media.findOne({
       where: { id: mediaId },
@@ -93,9 +85,9 @@ export class MediaService {
     if (row.author?.user?.id !== userId) {
       throw new ForbiddenException('내가 올린 사진만 삭제할 수 있습니다.');
     }
-    const photoUrl = row.photoUrl;
+    const urls = this.itemsOf(row).map((i) => i.url);
     await this.media.remove(row);
-    await this.storage.removeByUrl(photoUrl);
+    for (const url of urls) await this.storage.removeByUrl(url);
     return { ok: true };
   }
 
@@ -107,10 +99,19 @@ export class MediaService {
     return m;
   }
 
+  // 예전 한 장짜리 글은 photoUrl 컬럼에만 값이 있다. 읽을 때 items 모양으로 맞춘다.
+  private itemsOf(m: Media): MediaItem[] {
+    if (m.items?.length) return m.items;
+    return m.photoUrl ? [{ url: m.photoUrl, type: 'image' }] : [];
+  }
+
   private serialize(m: Media) {
+    const items = this.itemsOf(m);
     return {
       id: m.id,
-      photoUrl: m.photoUrl,
+      items,
+      // 목록에서 대표로 쓸 첫 장
+      coverUrl: items[0]?.url ?? null,
       caption: m.caption,
       createdAt: m.createdAt,
       author: m.author

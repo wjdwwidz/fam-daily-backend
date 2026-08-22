@@ -8,14 +8,25 @@ import {
 import { Group } from './group.entity';
 import { Membership } from './membership.entity';
 
-// 일상 사진 — 특정 그룹에 속하고, 올린 사람(멤버십)에 연결됨
+export type MediaItem = {
+  url: string;
+  type: 'image' | 'video';
+};
+
+// 일상 게시글 — 특정 그룹에 속하고, 올린 사람(멤버십)에 연결됨
 @Entity()
 export class Media {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 500 })
-  photoUrl: string; // Supabase Storage 의 public URL
+  // 게시글 한 개에 사진·영상 여러 개. 고른 순서 그대로 보여준다.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  items: MediaItem[];
+
+  // 이전 버전(한 장짜리)에서 만들어진 글을 계속 읽기 위해 남겨둔 컬럼.
+  // 새 글은 items 에만 쓴다.
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl: string | null;
 
   @Column({ type: 'text', default: '' })
   caption: string; // 이 순간을 한 줄로
