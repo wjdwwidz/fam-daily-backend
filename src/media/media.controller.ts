@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFiles,
   UseGuards,
@@ -69,6 +70,27 @@ export class MediaController {
   @ApiOperation({ summary: '일상 사진 상세' })
   getOne(@CurrentUser() user: AuthUser, @Param('mediaId') mediaId: string) {
     return this.media.getOne(user.id, mediaId);
+  }
+
+  // 수정도 올리기와 같은 multipart. files 를 새로 보내면 사진이 통째로 교체되고,
+  // 안 보내면 기존 사진은 그대로 두고 글(caption)만 바뀐다.
+  @Patch('media/:mediaId')
+  @ApiOperation({ summary: '일상 수정 (올린 본인만) — 글 수정 · 사진 교체' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('files', MAX_FILES, {
+      limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
+      fileFilter: (_req, file, cb) =>
+        cb(null, /^(image|video)\//.test(file.mimetype)),
+    }),
+  )
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('mediaId') mediaId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('caption') caption?: string,
+  ) {
+    return this.media.update(user.id, mediaId, files ?? [], caption);
   }
 
   @Delete('media/:mediaId')
