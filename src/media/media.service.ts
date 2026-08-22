@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { PendingUpload } from '../entities/pending-upload.entity';
-import { CommitUploadDto, PrepareUploadDto } from './dto/media.dto';
+import { CommitUploadDto, PrepareUploadDto, UpdateMediaDto } from './dto/media.dto';
 import { Media, MediaItem } from '../entities/media.entity';
 import { Membership } from '../entities/membership.entity';
 import { StorageService } from '../uploads/storage.service';
@@ -69,12 +69,12 @@ export class MediaService {
     );
   }
 
-  async commitUpload(userId: string, groupId: string, dto: CommitUploadDto) {
-    const membership = await this.assertMember(userId, groupId);
-    const rows = await this.pending.find({ where: { id: In(dto.uploadIds) } });
+  // 내가 준비한 자리인지 확인하고, 실제로 올라왔는지 확인해 순서대로 돌려준다.
+  private async claimPendings(userId: string, groupId: string, uploadIds: string[]) {
+    const rows = await this.pending.find({ where: { id: In(uploadIds) } });
 
     // 남의 자리로 글을 만들지 못하게 한다
-    if (rows.length !== dto.uploadIds.length) {
+    if (rows.length !== uploadIds.length) {
       throw new BadRequestException('만료되었거나 없는 업로드입니다. 다시 시도해주세요.');
     }
     for (const r of rows) {
@@ -85,19 +85,29 @@ export class MediaService {
 
     // 클라이언트가 보낸 순서를 유지한다
     const byId = new Map(rows.map((r) => [r.id, r]));
-    const ordered = dto.uploadIds.map((id) => byId.get(id)!);
+    const ordered = uploadIds.map((id) => byId.get(id)!);
 
-    // 실제로 올라왔는지 확인
+    // 실제로 올라왔는지 확인. 없으면 업로드 없이 커밋만 불러
+    // 존재하지 않는 URL 을 DB 에 넣을 수 있다.
     for (const r of ordered) {
       if (!(await this.storage.existsAt(r.path))) {
         throw new BadRequestException('아직 올라오지 않은 파일이 있어요.');
       }
     }
+    return ordered;
+  }
 
-    const items: MediaItem[] = ordered.map((r) => ({
+  private toItems(rows: PendingUpload[]): MediaItem[] {
+    return rows.map((r) => ({
       url: this.storage.publicUrlFor(r.path),
       type: /^video\//.test(r.contentType) ? 'video' : 'image',
     }));
+  }
+
+  async commitUpload(userId: string, groupId: string, dto: CommitUploadDto) {
+    const membership = await this.assertMember(userId, groupId);
+    const ordered = await this.claimPendings(userId, groupId, dto.uploadIds);
+    const items = this.toItems(ordered);
 
     // Media 생성과 PendingUpload 삭제를 한 트랜잭션으로 묶는다.
     // 나뉘면 "글은 있는데 pending 도 남은" 상태가 되고, 스윕이 살아 있는
@@ -181,12 +191,9 @@ export class MediaService {
   //    반대로 하면 저장이 실패했을 때 이미 지운 옛 파일을 되돌릴 수 없다.
   //  - 저장이 실패하면 방금 올린 새 파일을 되돌린다. 안 그러면 아무도 참조하지
   //    않는 파일이 버킷에 남는다(고아 파일).
-  async update(
-    userId: string,
-    mediaId: string,
-    files: Express.Multer.File[],
-    caption?: string,
-  ) {
+  // 수정도 올리기와 같은 2단계를 쓴다. uploadIds 를 보내면 사진이 통째로
+  // 교체되고, 생략하면 글(caption)만 바뀐다.
+  async update(userId: string, mediaId: string, dto: UpdateMediaDto) {
     const row = await this.media.findOne({
       where: { id: mediaId },
       relations: { author: { user: true } },
@@ -197,32 +204,27 @@ export class MediaService {
       throw new ForbiddenException('내가 올린 사진만 수정할 수 있습니다.');
     }
 
-    if (caption !== undefined) row.caption = caption;
+    if (dto.caption !== undefined) row.caption = dto.caption;
 
     // 사진을 새로 안 골랐으면 글만 바뀐다. 파일은 손대지 않으므로 정리할 것도 없다.
-    if (!files.length) {
+    if (!dto.uploadIds?.length) {
       await this.media.save(row);
       return this.getOne(userId, mediaId);
     }
 
+    const ordered = await this.claimPendings(userId, row.groupId, dto.uploadIds);
     const oldUrls = this.itemsOf(row).map((i) => i.url);
-    const items: MediaItem[] = [];
-    try {
-      for (const file of files) {
-        const url = await this.storage.upload(file, 'media');
-        items.push({
-          url,
-          type: /^video\//.test(file.mimetype) ? 'video' : 'image',
-        });
-      }
+    const items = this.toItems(ordered);
+
+    // 교체와 pending 삭제를 한 트랜잭션으로. 나뉘면 스윕이 방금 붙인 파일을 지운다.
+    await this.dataSource.transaction(async (m) => {
       row.items = items;
       // 예전 한 장짜리 컬럼은 더 이상 이 글을 대표하지 않는다
       row.photoUrl = null;
-      await this.media.save(row);
-    } catch (e) {
-      for (const it of items) await this.storage.removeByUrl(it.url);
-      throw e;
-    }
+      await m.save(Media, row);
+      await m.delete(PendingUpload, { id: In(ordered.map((r) => r.id)) });
+    });
+
     // 교체가 DB 에 확정됐다. 이제 아무도 참조하지 않는 옛 파일을 지운다.
     for (const url of oldUrls) await this.storage.removeByUrl(url);
     return this.getOne(userId, mediaId);

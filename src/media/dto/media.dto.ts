@@ -55,3 +55,22 @@ export class CommitUploadDto {
   @MaxLength(300)
   caption?: string;
 }
+
+export class UpdateMediaDto {
+  @ApiPropertyOptional({
+    type: [String],
+    description: '보내면 사진·영상이 통째로 교체된다. 생략하면 글만 바뀐다.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  uploadIds?: string[];
+
+  @ApiPropertyOptional({ example: '오늘 저녁 산책' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  caption?: string;
+}
