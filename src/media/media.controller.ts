@@ -20,6 +20,8 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { MediaService } from './media.service';
+import { SweepService } from './sweep.service';
+import { CommitUploadDto, PrepareUploadDto } from './dto/media.dto';
 
 // 한 글에 담을 수 있는 최대 개수와 개당 크기.
 // 메모리 버퍼링이라 이 둘의 곱이 곧 최악의 순간 메모리 사용량이다.
@@ -31,7 +33,35 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class MediaController {
-  constructor(private readonly media: MediaService) {}
+  constructor(
+    private readonly media: MediaService,
+    private readonly sweep: SweepService,
+  ) {}
+
+  // ── 직접 업로드 (권장) ────────────────────────────────────────────
+  // 파일이 서버를 거치지 않는다. 자세한 흐름은 MediaService 주석 참고.
+
+  @Post('groups/:groupId/media/prepare')
+  @ApiOperation({
+    summary: '업로드 준비 — 올릴 자리와 서명 URL 을 받는다 (파일은 스토리지로 직행)',
+  })
+  prepare(
+    @CurrentUser() user: AuthUser,
+    @Param('groupId') groupId: string,
+    @Body() dto: PrepareUploadDto,
+  ) {
+    return this.media.prepareUpload(user.id, groupId, dto);
+  }
+
+  @Post('groups/:groupId/media/commit')
+  @ApiOperation({ summary: '업로드 확정 — 올린 것들로 글 하나를 만든다' })
+  commit(
+    @CurrentUser() user: AuthUser,
+    @Param('groupId') groupId: string,
+    @Body() dto: CommitUploadDto,
+  ) {
+    return this.media.commitUpload(user.id, groupId, dto);
+  }
 
   @Get('groups/:groupId/media')
   @ApiOperation({ summary: '그룹의 일상 사진 목록 (최신순)' })

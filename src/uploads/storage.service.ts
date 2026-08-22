@@ -54,6 +54,71 @@ export class StorageService {
     return data.publicUrl;
   }
 
+  // 클라이언트가 스토리지에 직접 올릴 수 있는 한시적 URL (2시간).
+  // 경로를 서버가 정하므로 남의 파일을 덮어쓸 수 없다.
+  async createSignedUpload(path: string) {
+    const client = this.requireClient();
+    const { data, error } = await client.storage
+      .from(this.bucket)
+      .createSignedUploadUrl(path);
+    if (error || !data) {
+      this.logger.error(`서명 URL 발급 실패: ${error?.message}`);
+      throw new InternalServerErrorException(
+        '업로드 준비에 실패했습니다.',
+      );
+    }
+    return { signedUrl: data.signedUrl, token: data.token, path: data.path };
+  }
+
+  // 커밋 시점에 파일이 실제로 올라왔는지 확인한다.
+  // 이게 없으면 업로드 없이 커밋만 불러 존재하지 않는 URL 을 DB 에 넣을 수 있다.
+  async existsAt(path: string): Promise<boolean> {
+    const client = this.requireClient();
+    const slash = path.lastIndexOf('/');
+    const dir = slash === -1 ? '' : path.slice(0, slash);
+    const name = slash === -1 ? path : path.slice(slash + 1);
+    const { data, error } = await client.storage
+      .from(this.bucket)
+      .list(dir, { search: name, limit: 1 });
+    if (error) {
+      this.logger.warn(`존재 확인 실패(${path}): ${error.message}`);
+      return false;
+    }
+    return !!data?.some((f) => f.name === name);
+  }
+
+  publicUrlFor(path: string): string {
+    const client = this.requireClient();
+    return client.storage.from(this.bucket).getPublicUrl(path).data.publicUrl;
+  }
+
+  async removeByPath(path: string): Promise<void> {
+    if (!this.client || !path) return;
+    const { error } = await this.client.storage.from(this.bucket).remove([path]);
+    if (error) this.logger.warn(`파일 삭제 실패(무시): ${error.message}`);
+  }
+
+  private requireClient(): SupabaseClient {
+    if (!this.client) {
+      throw new InternalServerErrorException(
+        '스토리지가 설정되지 않았습니다 (SUPABASE_URL/SUPABASE_SERVICE_KEY 필요).',
+      );
+    }
+    return this.client;
+  }
+
+  // 버킷 내 저장 경로를 만든다 (경로 주입 방지 + 충돌 없는 파일명)
+  buildPath(folder: string, originalName: string, contentType: string): string {
+    const safeFolder = (folder || '')
+      .replace(/[^a-zA-Z0-9/_-]/g, '')
+      .replace(/^\/+|\/+$/g, '');
+    const fromName = extname(originalName || '');
+    const fromType = contentType?.split('/')[1]?.split(';')[0];
+    const ext = fromName || (fromType ? `.${fromType}` : '.bin');
+    const file_name = `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`;
+    return safeFolder ? `${safeFolder}/${file_name}` : file_name;
+  }
+
   // public URL 에서 이 버킷의 파일 경로를 뽑아 삭제. 우리 버킷 파일이 아니면 무시.
   // (프로필/사전 사진 교체 시 예전 파일이 orphan 으로 쌓이지 않도록)
   async removeByUrl(publicUrl?: string | null): Promise<void> {

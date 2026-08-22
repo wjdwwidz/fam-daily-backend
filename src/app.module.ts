@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { GroupsModule } from './groups/groups.module';
@@ -14,18 +15,23 @@ import { Membership } from './entities/membership.entity';
 import { Invite } from './entities/invite.entity';
 import { Word } from './entities/word.entity';
 import { Media } from './entities/media.entity';
+import { PendingUpload } from './entities/pending-upload.entity';
 import { Question } from './entities/question.entity';
 import { Answer } from './entities/answer.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(), // 스윕(버려진 업로드 청소) 스케줄러
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const common = {
           type: 'postgres' as const,
-          entities: [User, Group, Membership, Invite, Word, Question, Answer, Media],
+          entities: [
+            User, Group, Membership, Invite, Word, Question, Answer,
+            Media, PendingUpload,
+          ],
           synchronize: true, // 개발용: 엔티티 기준으로 테이블 자동 생성 (운영은 마이그레이션 사용)
           // 클라우드 Postgres(Supabase 등)는 SSL 필요 → DB_SSL=true. 로컬 Docker는 미설정(=false)
           ssl:
