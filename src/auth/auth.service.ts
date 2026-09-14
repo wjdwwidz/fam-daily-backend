@@ -5,16 +5,23 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
+import { Group } from '../entities/group.entity';
+import { Membership } from '../entities/membership.entity';
+import { Media } from '../entities/media.entity';
+import { Word } from '../entities/word.entity';
+import { PendingUpload } from '../entities/pending-upload.entity';
+import { Role } from '../entities/role.enum';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { StorageService } from '../uploads/storage.service';
 
 const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 const KAKAO_USER_URL = 'https://kapi.kakao.com/v2/user/me';
+const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
 
 // 카카오가 이름을 안 내려줄 때만 쓰는 임시 이름. 나중 로그인에서 실제 닉네임으로 교체된다.
 const KAKAO_FALLBACK_NAME = '카카오 사용자';
@@ -48,10 +55,100 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private sign(user: { id: string; email: string }) {
     return this.jwt.sign({ sub: user.id, email: user.email });
+  }
+
+  // 회원 탈퇴 (App Store 심사 5.1.1(v) — 앱 안에서 계정을 지울 수 있어야 한다)
+  //
+  // 가족 공간에 남긴 사진·단어·문답은 지우지 않는다. 가족에게는 함께 쌓은 기록이라서다.
+  // 대신 멤버십에서 유저 연결만 끊는다. 글에는 그룹 내 호칭(엄마·아빠)만 남고
+  // 이름·프로필 사진·카카오 계정 같은 개인 정보는 사라진다.
+  //
+  // 방장이 나가면 가장 먼저 들어온 구성원이 방장을 넘겨받는다.
+  // 남은 구성원이 없는 공간은 아무도 볼 수 없으므로 통째로 지운다.
+  async deleteMe(userId: string) {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    // 파일은 DB 가 확정된 뒤에 지운다. 먼저 지우면 롤백돼도 파일은 되돌릴 수 없다.
+    const urls: string[] = user.photoUrl ? [user.photoUrl] : [];
+    const paths: string[] = [];
+
+    await this.dataSource.transaction(async (m) => {
+      const mine = await m.find(Membership, {
+        where: { user: { id: userId } },
+        relations: { group: true },
+      });
+
+      for (const my of mine) {
+        const groupId = my.group.id;
+        // 이미 탈퇴해 user 가 비어 있는 멤버십은 id 비교에서 빠진다 (NULL <> x 는 참이 아님)
+        const others = await m.find(Membership, {
+          where: { group: { id: groupId }, user: { id: Not(userId) } },
+          order: { createdAt: 'ASC' },
+        });
+
+        if (others.length === 0) {
+          const media = await m.find(Media, { where: { groupId } });
+          for (const row of media) {
+            for (const it of row.items ?? []) urls.push(it.url);
+            if (row.photoUrl) urls.push(row.photoUrl);
+          }
+          const words = await m.find(Word, { where: { groupId } });
+          for (const w of words) if (w.photoUrl) urls.push(w.photoUrl);
+          // 글·단어·문답·초대·멤버십은 FK CASCADE 로 함께 사라진다
+          await m.delete(Group, { id: groupId });
+          continue;
+        }
+
+        if (my.role === Role.OWNER) {
+          await m.update(Membership, { id: others[0].id }, { role: Role.OWNER });
+        }
+        // 호칭은 남기고, 이 사람을 가리키는 흔적(연결·역할·한마디)만 지운다
+        await m.update(
+          Membership,
+          { id: my.id },
+          { user: null, role: Role.MEMBER, mood: null, moodEmoji: null, moodAt: null },
+        );
+      }
+
+      const pendings = await m.find(PendingUpload, { where: { userId } });
+      paths.push(...pendings.map((p) => p.path));
+      await m.delete(PendingUpload, { userId });
+      await m.delete(User, { id: userId });
+    });
+
+    for (const url of urls) await this.storage.removeByUrl(url);
+    for (const path of paths) await this.storage.removeByPath(path);
+    await this.unlinkKakao(user);
+    return { ok: true };
+  }
+
+  // 카카오 연결 끊기 — 다시 가입할 때 동의 화면부터 새로 시작하게 한다.
+  // 탈퇴는 이미 끝났으므로 어드민 키가 없거나 실패해도 경고만 남긴다.
+  private async unlinkKakao(user: User) {
+    const adminKey = this.config.get<string>('KAKAO_ADMIN_KEY');
+    if (user.provider !== 'kakao' || !user.providerId || !adminKey) return;
+    try {
+      const res = await fetch(KAKAO_UNLINK_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `KakaoAK ${adminKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        },
+        body: new URLSearchParams({
+          target_id_type: 'user_id',
+          target_id: user.providerId,
+        }),
+      });
+      if (!res.ok) this.logger.warn(`[kakao] 연결 끊기 실패 status=${res.status}`);
+    } catch (e) {
+      this.logger.warn(`[kakao] 연결 끊기 실패: ${(e as Error).message}`);
+    }
   }
 
   // 내 프로필(이름) 수정

@@ -36,8 +36,12 @@ export class Membership {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User, (u) => u.memberships, { onDelete: 'CASCADE' })
-  user: User;
+  // 탈퇴하면 null. 멤버십은 지우지 않아서 그 사람이 남긴 글에 호칭이 계속 보인다.
+  @ManyToOne(() => User, (u) => u.memberships, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  user: User | null;
 
   @ManyToOne(() => Group, (g) => g.memberships, { onDelete: 'CASCADE' })
   group: Group;

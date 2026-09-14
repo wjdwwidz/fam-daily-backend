@@ -37,19 +37,29 @@ export class GroupsService {
   async listMine(userId: string) {
     const mems = await this.memberships.listForUser(userId);
 
-    return mems.map((m) => ({
-      id: m.group.id,
-      name: m.group.name,
-      myRole: m.role,
-      myNickname: m.nickname,
-      memberCount: m.group.memberships.length,
-      members: m.group.memberships.slice(0, 5).map((mm) => ({
-        userId: mm.user.id,
-        nickname: mm.nickname,
-        name: mm.user.name,
-        photoUrl: mm.user.photoUrl,
-      })),
-    }));
+    return mems.map((m) => {
+      // 탈퇴한 사람의 멤버십은 글에 호칭을 보여주려고 남겨둔 것이다. 구성원으로 세지 않는다.
+      const members = m.group.memberships.flatMap((mm) =>
+        mm.user
+          ? [
+              {
+                userId: mm.user.id,
+                nickname: mm.nickname,
+                name: mm.user.name,
+                photoUrl: mm.user.photoUrl,
+              },
+            ]
+          : [],
+      );
+      return {
+        id: m.group.id,
+        name: m.group.name,
+        myRole: m.role,
+        myNickname: m.nickname,
+        memberCount: members.length,
+        members: members.slice(0, 5),
+      };
+    });
   }
 
   // 그룹 상세 + 구성원 (멤버 검사는 GroupMemberGuard가 담당)
@@ -63,16 +73,23 @@ export class GroupsService {
     return {
       id: group.id,
       name: group.name,
-      members: group.memberships.map((m) => ({
-        userId: m.user.id,
-        name: m.user.name,
-        nickname: m.nickname,
-        photoUrl: m.user.photoUrl,
-        role: m.role,
-        mood: m.mood,
-        moodEmoji: m.moodEmoji,
-        moodAt: m.moodAt,
-      })),
+      // 탈퇴한 사람(user 가 null)은 구성원 목록에서 뺀다
+      members: group.memberships.flatMap((m) =>
+        m.user
+          ? [
+              {
+                userId: m.user.id,
+                name: m.user.name,
+                nickname: m.nickname,
+                photoUrl: m.user.photoUrl,
+                role: m.role,
+                mood: m.mood,
+                moodEmoji: m.moodEmoji,
+                moodAt: m.moodAt,
+              },
+            ]
+          : [],
+      ),
     };
   }
 

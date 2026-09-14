@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -89,6 +90,16 @@ export class AuthController {
   @ApiOperation({ summary: '내 프로필(이름) 수정' })
   updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
     return this.auth.updateMe(user.id, dto);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '회원 탈퇴 — 개인정보는 지우고, 가족 공간의 기록은 호칭과 함께 남긴다',
+  })
+  deleteMe(@CurrentUser() user: AuthUser) {
+    return this.auth.deleteMe(user.id);
   }
 
   // 업로드와 DB 기록을 한 요청으로 묶는다 (고아 파일 방지). 자세한 이유는 서비스에.

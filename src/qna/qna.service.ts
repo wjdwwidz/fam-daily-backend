@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
@@ -110,8 +110,11 @@ export class QnaService {
     });
   }
 
+  // 탈퇴한 사람(user 가 null)의 멤버십은 호칭 표시용이라 세지 않는다
   private memberCount(groupId: string) {
-    return this.memberships.count({ where: { group: { id: groupId } } });
+    return this.memberships.count({
+      where: { group: { id: groupId }, user: { id: Not(IsNull()) } },
+    });
   }
 
   private async assertMember(userId: string, groupId: string) {
