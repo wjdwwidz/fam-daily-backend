@@ -10,15 +10,7 @@ import { QnaModule } from './qna/qna.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { LegalModule } from './legal/legal.module';
 import { AppController } from './app.controller';
-import { User } from './entities/user.entity';
-import { Group } from './entities/group.entity';
-import { Membership } from './entities/membership.entity';
-import { Invite } from './entities/invite.entity';
-import { Word } from './entities/word.entity';
-import { Media } from './entities/media.entity';
-import { PendingUpload } from './entities/pending-upload.entity';
-import { Question } from './entities/question.entity';
-import { Answer } from './entities/answer.entity';
+import { typeOrmOptions } from './database/typeorm-options';
 
 @Module({
   imports: [
@@ -27,36 +19,16 @@ import { Answer } from './entities/answer.entity';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const common = {
-          type: 'postgres' as const,
-          entities: [
-            User, Group, Membership, Invite, Word, Question, Answer,
-            Media, PendingUpload,
-          ],
-          synchronize: true, // 개발용: 엔티티 기준으로 테이블 자동 생성 (운영은 마이그레이션 사용)
-          // 클라우드 Postgres(Supabase 등)는 SSL 필요 → DB_SSL=true. 로컬 Docker는 미설정(=false)
-          ssl:
-            config.get<string>('DB_SSL') === 'true'
-              ? { rejectUnauthorized: false }
-              : false,
-        };
-        // DB_HOST가 있으면 필드별 접속(특수문자 비번 URL 인코딩 문제 회피), 없으면 DATABASE_URL 사용
         const host = config.get<string>('DB_HOST');
         // [진단] 어느 DB로 접속 시도하는지 (비번 제외) — Railway 로그에서 확인용
         console.log(
           `[DB] mode=${host ? 'fields' : 'url'} host=${host ?? '(none→URL fallback)'} port=${config.get<string>('DB_PORT') ?? '(default)'} ssl=${config.get<string>('DB_SSL')}`,
         );
-        if (host) {
-          return {
-            ...common,
-            host,
-            port: Number(config.get<string>('DB_PORT')) || 5432,
-            username: config.get<string>('DB_USER'),
-            password: config.get<string>('DB_PASSWORD'),
-            database: config.get<string>('DB_NAME') || 'postgres',
-          };
-        }
-        return { ...common, url: config.get<string>('DATABASE_URL') };
+        return {
+          ...typeOrmOptions((key) => config.get<string>(key)),
+          // 서버가 뜰 때 아직 적용 안 된 마이그레이션을 실행한다 (운영 배포 = 마이그레이션 적용)
+          migrationsRun: true,
+        };
       },
     }),
     AuthModule,
