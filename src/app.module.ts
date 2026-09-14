@@ -9,6 +9,7 @@ import { MediaModule } from './media/media.module';
 import { QnaModule } from './qna/qna.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { LegalModule } from './legal/legal.module';
+import { ActivityModule } from './activity/activity.module';
 import { AppController } from './app.controller';
 import { typeOrmOptions } from './database/typeorm-options';
 
@@ -38,6 +39,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     QnaModule,
     UploadsModule,
     LegalModule,
+    ActivityModule,
   ],
   controllers: [AppController],
 })
