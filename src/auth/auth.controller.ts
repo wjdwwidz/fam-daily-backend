@@ -38,6 +38,8 @@ export class AuthController {
   @ApiOperation({ summary: '카카오 로그인 시작 (카카오 인증 화면으로 리다이렉트)' })
   kakaoLogin(@Query('redirect') redirect: string, @Res() res: Response) {
     // redirect: 로그인 성공 후 돌아갈 주소 (앱 딥링크 등). 없으면 기본 프론트로.
+    // 토큰이 붙어 나갈 주소라, 허용된 앱/웹 주소가 아니면 카카오로 보내기 전에 거절한다.
+    if (redirect) this.auth.assertAllowedRedirect(redirect);
     return res.redirect(this.auth.buildKakaoAuthUrl(redirect));
   }
 
@@ -50,6 +52,9 @@ export class AuthController {
     @Query('state') state: string,
     @Res() res: Response,
   ) {
+    // state 는 공격자가 카카오 인증 URL 을 직접 만들어 바꿀 수 있다. /auth/kakao 를 거쳤다고 믿지 않고
+    // 여기서 다시 검사한다. 인가 코드를 쓰기(토큰 교환) 전에 막아야 코드도 소모되지 않는다.
+    if (state) this.auth.assertAllowedRedirect(state);
     const { accessToken } = await this.auth.loginWithKakao(code);
     // state 로 전달된 앱 딥링크(있으면)로, 없으면 기본 프론트 주소로 토큰 붙여 리다이렉트
     const base = state || this.config.getOrThrow<string>('FRONTEND_REDIRECT_URL');

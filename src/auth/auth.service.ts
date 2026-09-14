@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -220,6 +221,55 @@ export class AuthService {
       name: user.name,
       photoUrl: user.photoUrl,
     };
+  }
+
+  // 로그인 후 우리 JWT 를 붙여 보낼 주소가 우리 앱/웹인지 확인한다.
+  //
+  // redirect 는 요청하는 쪽이 마음대로 넣을 수 있는 값이다. 검사하지 않으면 공격자가 자기 주소를 넣은
+  // 로그인 링크를 보내고, 피해자가 카카오 로그인을 마치는 순간 토큰이 공격자에게 넘어간다.
+  assertAllowedRedirect(redirect: string): void {
+    let url: URL;
+    try {
+      url = new URL(redirect);
+    } catch {
+      throw new BadRequestException('허용되지 않은 redirect 주소입니다.');
+    }
+    // 설치된 앱의 딥링크 (app.json scheme)
+    if (url.protocol === 'famdaily:') return;
+    // Expo Go 는 개발 서버 주소를 그대로 딥링크로 쓴다. 누구나 자기 개발 서버를 띄울 수 있어
+    // 운영에서 열어두면 토큰이 남의 서버로 갈 수 있으므로, 개발할 때만 명시적으로 켠다.
+    if (
+      (url.protocol === 'exp:' || url.protocol === 'exps:') &&
+      this.config.get<string>('ALLOW_EXPO_GO_REDIRECT') === 'true'
+    ) {
+      return;
+    }
+    if (
+      (url.protocol === 'https:' || url.protocol === 'http:') &&
+      this.allowedWebOrigins().has(url.origin)
+    ) {
+      return;
+    }
+    throw new BadRequestException('허용되지 않은 redirect 주소입니다.');
+  }
+
+  // 기본 프론트 주소의 도메인 + WEB_REDIRECT_ORIGINS 에 적은 도메인
+  private allowedWebOrigins(): Set<string> {
+    const candidates = [
+      this.config.get<string>('FRONTEND_REDIRECT_URL'),
+      ...(this.config.get<string>('WEB_REDIRECT_ORIGINS') ?? '').split(','),
+    ];
+    const origins = new Set<string>();
+    for (const c of candidates) {
+      const value = c?.trim();
+      if (!value) continue;
+      try {
+        origins.add(new URL(value).origin);
+      } catch {
+        this.logger.warn(`[kakao] 허용 주소 설정을 해석할 수 없어 무시: ${value}`);
+      }
+    }
+    return origins;
   }
 
   // 1) 카카오 로그인 화면으로 보낼 authorize URL 생성
