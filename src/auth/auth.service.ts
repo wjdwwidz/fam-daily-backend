@@ -10,14 +10,12 @@ import { DataSource, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
-import { Group } from '../entities/group.entity';
 import { Membership } from '../entities/membership.entity';
-import { Media } from '../entities/media.entity';
-import { Word } from '../entities/word.entity';
 import { PendingUpload } from '../entities/pending-upload.entity';
 import { Role } from '../entities/role.enum';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { StorageService } from '../uploads/storage.service';
+import { removeGroupData } from '../groups/group-removal';
 
 const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
@@ -99,15 +97,10 @@ export class AuthService {
         });
 
         if (others.length === 0) {
-          const media = await m.find(Media, { where: { groupId } });
-          for (const row of media) {
-            for (const it of row.items ?? []) urls.push(it.url);
-            if (row.photoUrl) urls.push(row.photoUrl);
-          }
-          const words = await m.find(Word, { where: { groupId } });
-          for (const w of words) if (w.photoUrl) urls.push(w.photoUrl);
-          // 글·단어·문답·초대·멤버십은 FK CASCADE 로 함께 사라진다
-          await m.delete(Group, { id: groupId });
+          // 가족 삭제와 같은 정리 (사전 사진 여러 장·올리다 만 파일 포함)
+          const files = await removeGroupData(m, groupId);
+          urls.push(...files.urls);
+          paths.push(...files.paths);
           continue;
         }
 

@@ -4,12 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Group } from '../entities/group.entity';
 import { Role } from '../entities/role.enum';
 import { CreateGroupDto, JoinGroupDto, SetMoodDto } from './dto/group.dto';
 import { MembershipsService } from './memberships.service';
 import { InvitesService } from './invites.service';
+import { StorageService } from '../uploads/storage.service';
+import { removeGroupData } from './group-removal';
 
 @Injectable()
 export class GroupsService {
@@ -17,6 +19,8 @@ export class GroupsService {
     @InjectRepository(Group) private readonly groups: Repository<Group>,
     private readonly memberships: MembershipsService,
     private readonly invites: InvitesService,
+    private readonly storage: StorageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // 그룹 공간 생성 → 생성자는 OWNER 멤버십
@@ -106,6 +110,21 @@ export class GroupsService {
       throw new ForbiddenException('그룹 이름은 방장만 수정할 수 있습니다.');
     await this.groups.update({ id: groupId }, { name });
     return this.getOne(groupId);
+  }
+
+  // 가족 공간 삭제 — 방장(OWNER)만.
+  // 사진·단어·문답·구성원이 모두 사라지고 되돌릴 수 없다. 구성원 모두에게서 사라진다.
+  async deleteGroup(userId: string, groupId: string) {
+    const m = await this.memberships.assertMember(userId, groupId);
+    if (m.role !== Role.OWNER)
+      throw new ForbiddenException('가족 공간은 방장만 삭제할 수 있습니다.');
+    const files = await this.dataSource.transaction((tx) =>
+      removeGroupData(tx, groupId),
+    );
+    // DB 삭제가 확정된 뒤에야 파일을 지운다
+    for (const url of files.urls) await this.storage.removeByUrl(url);
+    for (const path of files.paths) await this.storage.removeByPath(path);
+    return { ok: true };
   }
 
   // 내 호칭 수정 (멤버 검사는 GroupMemberGuard가 담당) → 갱신된 그룹 상세 반환

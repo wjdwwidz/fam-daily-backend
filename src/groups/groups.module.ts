@@ -7,9 +7,10 @@ import { GroupsController } from './groups.controller';
 import { Group } from '../entities/group.entity';
 import { Membership } from '../entities/membership.entity';
 import { Invite } from '../entities/invite.entity';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Group, Membership, Invite])],
+  imports: [TypeOrmModule.forFeature([Group, Membership, Invite]), UploadsModule],
   controllers: [GroupsController],
   providers: [GroupsService, MembershipsService, InvitesService],
 })

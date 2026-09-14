@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -68,6 +69,14 @@ export class GroupsController {
     @Body() dto: RenameGroupDto,
   ) {
     return this.groups.renameGroup(user.id, id, dto.name);
+  }
+
+  // 가족 공간 삭제 (방장만 — 멤버 가드 + 서비스에서 OWNER 검사)
+  @Delete(':id')
+  @UseGuards(GroupMemberGuard)
+  @ApiOperation({ summary: '가족 공간 삭제 (방장만). 사진·단어·문답 모두 삭제' })
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.groups.deleteGroup(user.id, id);
   }
 
   // 오늘의 한마디(무드) 설정 (멤버만 — GroupMemberGuard)
