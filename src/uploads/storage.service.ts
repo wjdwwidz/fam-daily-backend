@@ -14,9 +14,11 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly client: SupabaseClient | null;
   private readonly bucket: string;
+  private readonly supabaseUrl: string;
 
   constructor(config: ConfigService) {
     const url = config.get<string>('SUPABASE_URL');
+    this.supabaseUrl = (url || '').replace(/\/+$/, '');
     const key = config.get<string>('SUPABASE_SERVICE_KEY');
     this.bucket = config.get<string>('SUPABASE_BUCKET') || 'photos';
     this.client = url && key ? createClient(url, key) : null;
@@ -119,16 +121,34 @@ export class StorageService {
     return safeFolder ? `${safeFolder}/${file_name}` : file_name;
   }
 
+  // public URL 이 우리 프로젝트·버킷의 파일이면 버킷 내 경로, 아니면 null
+  pathFromPublicUrl(publicUrl?: string | null): string | null {
+    if (!publicUrl || !this.supabaseUrl) return null;
+    const prefix = `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/`;
+    if (!publicUrl.startsWith(prefix)) return null;
+    let path: string;
+    try {
+      path = decodeURIComponent(publicUrl.slice(prefix.length).split('?')[0]);
+    } catch {
+      return null;
+    }
+    // words/../media/x 같은 경로로 다른 폴더를 가리키지 못하게
+    if (!path || path.split('/').some((seg) => seg === '..' || seg === '')) {
+      return null;
+    }
+    return path;
+  }
+
+  // 이 URL 이 우리 버킷의 folder/ 아래 파일인지 (예: 'words')
+  isInFolder(publicUrl: string, folder: string): boolean {
+    return !!this.pathFromPublicUrl(publicUrl)?.startsWith(`${folder}/`);
+  }
+
   // public URL 에서 이 버킷의 파일 경로를 뽑아 삭제. 우리 버킷 파일이 아니면 무시.
   // (프로필/사전 사진 교체 시 예전 파일이 orphan 으로 쌓이지 않도록)
   async removeByUrl(publicUrl?: string | null): Promise<void> {
-    if (!this.client || !publicUrl) return;
-    const marker = `/object/public/${this.bucket}/`;
-    const idx = publicUrl.indexOf(marker);
-    if (idx === -1) return; // 우리 버킷 URL 이 아니면 건드리지 않음
-    const path = decodeURIComponent(
-      publicUrl.slice(idx + marker.length).split('?')[0],
-    );
+    if (!this.client) return;
+    const path = this.pathFromPublicUrl(publicUrl); // 우리 버킷 URL 이 아니면 건드리지 않음
     if (!path) return;
     const { error } = await this.client.storage.from(this.bucket).remove([path]);
     if (error) {

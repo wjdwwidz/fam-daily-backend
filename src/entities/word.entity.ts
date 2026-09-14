@@ -27,8 +27,14 @@ export class Word {
   @Column({ type: 'text', default: '' })
   example: string; // 이럴 때 써요
 
+  // 사진 여러 장 (최대 10장). 고른 순서 그대로 보여준다.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  photoUrls: string[];
+
+  // 한 장짜리 시절 컬럼. 첫 장을 계속 같이 기록한다 —
+  // 업데이트 안 한 앱이 이 값만 읽고 쓰기 때문이고, 백엔드를 되돌려도 첫 장은 남는다.
   @Column({ type: 'varchar', nullable: true })
-  photoUrl: string | null; // 사진 (지금은 URL 문자열, 추후 파일 업로드)
+  photoUrl: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
