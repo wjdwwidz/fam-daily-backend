@@ -26,10 +26,11 @@ export class CreateWordDto {
   @MaxLength(300)
   example?: string;
 
-  @ApiPropertyOptional()
+  // 수정 시 null 을 보내면 사진 삭제, 생략하면 그대로 (IsOptional 은 null 도 통과시킨다)
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
-  photoUrl?: string;
+  photoUrl?: string | null;
 }
 
 export class UpdateWordDto extends PartialType(CreateWordDto) {}

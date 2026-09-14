@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Word } from '../entities/word.entity';
 import { Membership } from '../entities/membership.entity';
 import { CreateWordDto, UpdateWordDto } from './dto/word.dto';
+import { StorageService } from '../uploads/storage.service';
 
 @Injectable()
 export class WordsService {
@@ -15,6 +16,7 @@ export class WordsService {
     @InjectRepository(Word) private readonly words: Repository<Word>,
     @InjectRepository(Membership)
     private readonly memberships: Repository<Membership>,
+    private readonly storage: StorageService,
   ) {}
 
   // 그룹 단어 목록 (가나다순은 프론트에서 그룹핑, 여기선 최신순)
@@ -58,14 +60,20 @@ export class WordsService {
     const word = await this.words.findOne({ where: { id: wordId } });
     if (!word) throw new NotFoundException('단어를 찾을 수 없습니다.');
     await this.assertMember(userId, word.groupId);
+    const oldPhotoUrl = word.photoUrl;
     Object.assign(word, {
       term: dto.term ?? word.term,
       reading: dto.reading ?? word.reading,
       meaning: dto.meaning ?? word.meaning,
       example: dto.example ?? word.example,
+      // null 이면 사진 삭제, undefined 면 그대로
       photoUrl: dto.photoUrl !== undefined ? dto.photoUrl : word.photoUrl,
     });
     await this.words.save(word);
+    // 사진이 지워졌거나 바뀐 게 DB 에 확정된 뒤에야 옛 파일을 지운다
+    if (oldPhotoUrl && oldPhotoUrl !== word.photoUrl) {
+      await this.storage.removeByUrl(oldPhotoUrl);
+    }
     return this.getOne(userId, wordId);
   }
 
@@ -73,7 +81,9 @@ export class WordsService {
     const word = await this.words.findOne({ where: { id: wordId } });
     if (!word) throw new NotFoundException('단어를 찾을 수 없습니다.');
     await this.assertMember(userId, word.groupId);
+    const photoUrl = word.photoUrl;
     await this.words.remove(word);
+    await this.storage.removeByUrl(photoUrl);
     return { ok: true };
   }
 
