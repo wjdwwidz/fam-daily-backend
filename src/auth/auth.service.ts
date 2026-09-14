@@ -16,6 +16,7 @@ import { Role } from '../entities/role.enum';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { StorageService } from '../uploads/storage.service';
 import { removeGroupData } from '../groups/group-removal';
+import { removeUnusedProfilePhotos } from '../uploads/profile-photos';
 
 const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
@@ -79,8 +80,10 @@ export class AuthService {
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
     // 파일은 DB 가 확정된 뒤에 지운다. 먼저 지우면 롤백돼도 파일은 되돌릴 수 없다.
-    const urls: string[] = user.photoUrl ? [user.photoUrl] : [];
+    const urls: string[] = [];
     const paths: string[] = [];
+    // 프로필 사진은 여러 곳이 같은 파일을 가리킬 수 있어 '아무도 안 쓸 때만' 지운다
+    const profileUrls: (string | null)[] = [user.photoUrl];
 
     await this.dataSource.transaction(async (m) => {
       const mine = await m.find(Membership, {
@@ -101,17 +104,19 @@ export class AuthService {
           const files = await removeGroupData(m, groupId);
           urls.push(...files.urls);
           paths.push(...files.paths);
+          profileUrls.push(...files.profileUrls);
           continue;
         }
 
         if (my.role === Role.OWNER) {
           await m.update(Membership, { id: others[0].id }, { role: Role.OWNER });
         }
-        // 호칭은 남기고, 이 사람을 가리키는 흔적(연결·역할·한마디)만 지운다
+        // 호칭은 남기고, 이 사람을 가리키는 흔적(연결·역할·한마디·이 가족 사진)만 지운다
+        profileUrls.push(my.photoUrl);
         await m.update(
           Membership,
           { id: my.id },
-          { user: null, role: Role.MEMBER, mood: null, moodEmoji: null, moodAt: null },
+          { user: null, role: Role.MEMBER, mood: null, moodEmoji: null, moodAt: null, photoUrl: null },
         );
       }
 
@@ -123,6 +128,7 @@ export class AuthService {
 
     for (const url of urls) await this.storage.removeByUrl(url);
     for (const path of paths) await this.storage.removeByPath(path);
+    await removeUnusedProfilePhotos(this.dataSource, this.storage, profileUrls);
     await this.unlinkKakao(user);
     return { ok: true };
   }
@@ -168,13 +174,14 @@ export class AuthService {
         ...(dto.photoUrl !== undefined ? { photoUrl: dto.photoUrl } : {}),
       },
     );
-    // 사진이 실제로 바뀌었으면 예전 파일은 Storage 에서 제거 (기록 안 남김)
+    // 사진이 실제로 바뀌었으면 예전 파일 정리 — 가족별 사진으로 옮겨 담겨 아직 쓰일 수 있어
+    // 아무도 안 쓸 때만 지운다
     if (
       dto.photoUrl !== undefined &&
       oldPhotoUrl &&
       oldPhotoUrl !== dto.photoUrl
     ) {
-      await this.storage.removeByUrl(oldPhotoUrl);
+      await removeUnusedProfilePhotos(this.dataSource, this.storage, [oldPhotoUrl]);
     }
     const user = await this.users.findOneOrFail({ where: { id: userId } });
     return {
@@ -208,9 +215,10 @@ export class AuthService {
       throw e;
     }
 
-    // 여기서부터는 새 사진이 DB 에 확정됐다. 예전 파일은 지워도 안전하다.
+    // 여기서부터는 새 사진이 DB 에 확정됐다.
+    // 예전 파일은 가족별 사진으로 옮겨 담겨 아직 쓰일 수 있으니, 아무도 안 쓸 때만 지운다.
     if (oldPhotoUrl && oldPhotoUrl !== url) {
-      await this.storage.removeByUrl(oldPhotoUrl);
+      await removeUnusedProfilePhotos(this.dataSource, this.storage, [oldPhotoUrl]);
     }
     const user = await this.users.findOneOrFail({ where: { id: userId } });
     return {

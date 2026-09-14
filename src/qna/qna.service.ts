@@ -131,7 +131,8 @@ export class QnaService {
           userId: m.user?.id ?? null,
           nickname: m.nickname,
           name: m.user?.name ?? '',
-          photoUrl: m.user?.photoUrl ?? null,
+          // 이 가족에서 쓰는 사진 (없으면 이니셜)
+          photoUrl: m.photoUrl ?? null,
         }
       : null;
   }

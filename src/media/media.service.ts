@@ -275,7 +275,8 @@ export class MediaService {
             userId: m.author.user?.id ?? null,
             nickname: m.author.nickname,
             name: m.author.user?.name ?? '',
-            photoUrl: m.author.user?.photoUrl ?? null,
+            // 이 가족에서 쓰는 사진 (없으면 이니셜)
+            photoUrl: m.author.photoUrl ?? null,
           }
         : null,
     };

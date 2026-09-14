@@ -181,7 +181,8 @@ export class WordsService {
             userId: w.author.user?.id ?? null,
             nickname: w.author.nickname,
             name: w.author.user?.name ?? '',
-            photoUrl: w.author.user?.photoUrl ?? null,
+            // 이 가족에서 쓰는 사진 (없으면 이니셜)
+            photoUrl: w.author.photoUrl ?? null,
           }
         : null,
     };

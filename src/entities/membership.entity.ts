@@ -33,6 +33,11 @@ export class Membership {
   @Column({ type: 'timestamptz', nullable: true })
   moodAt: Date | null;
 
+  // 이 가족에서 쓰는 내 프로필 사진. 가족마다 다르게 둘 수 있고, 없으면 이니셜로 보인다.
+  // (계정 사진으로 대신하지 않는다 — 가족마다 따로 정하는 게 목적이다)
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  photoUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

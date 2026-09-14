@@ -11,6 +11,7 @@ import { CreateGroupDto, JoinGroupDto, SetMoodDto } from './dto/group.dto';
 import { MembershipsService } from './memberships.service';
 import { InvitesService } from './invites.service';
 import { StorageService } from '../uploads/storage.service';
+import { removeUnusedProfilePhotos } from '../uploads/profile-photos';
 import { removeGroupData } from './group-removal';
 
 @Injectable()
@@ -50,7 +51,8 @@ export class GroupsService {
                 userId: mm.user.id,
                 nickname: mm.nickname,
                 name: mm.user.name,
-                photoUrl: mm.user.photoUrl,
+                // 가족마다 다른 사진. 없으면 null → 이니셜
+                photoUrl: mm.photoUrl,
               },
             ]
           : [],
@@ -60,6 +62,7 @@ export class GroupsService {
         name: m.group.name,
         myRole: m.role,
         myNickname: m.nickname,
+        myPhotoUrl: m.photoUrl,
         memberCount: members.length,
         members: members.slice(0, 5),
       };
@@ -85,7 +88,7 @@ export class GroupsService {
                 userId: m.user.id,
                 name: m.user.name,
                 nickname: m.nickname,
-                photoUrl: m.user.photoUrl,
+                photoUrl: m.photoUrl,
                 role: m.role,
                 mood: m.mood,
                 moodEmoji: m.moodEmoji,
@@ -124,7 +127,35 @@ export class GroupsService {
     // DB 삭제가 확정된 뒤에야 파일을 지운다
     for (const url of files.urls) await this.storage.removeByUrl(url);
     for (const path of files.paths) await this.storage.removeByPath(path);
+    await removeUnusedProfilePhotos(this.dataSource, this.storage, files.profileUrls);
     return { ok: true };
+  }
+
+  // 이 가족에서 쓰는 내 프로필 사진 교체 → 갱신된 그룹 상세 반환.
+  // 업로드와 DB 기록을 한 요청으로 묶는다 (나눠 부르면 업로드만 성공했을 때 고아 파일이 남는다).
+  async updateMyPhoto(userId: string, groupId: string, file: Express.Multer.File) {
+    await this.memberships.assertMember(userId, groupId);
+    const url = await this.storage.upload(file, 'profiles');
+    let old: string | null;
+    try {
+      old = await this.memberships.setPhoto(userId, groupId, url);
+    } catch (e) {
+      // DB 기록 실패 → 방금 올린 파일은 아무도 가리키지 않는다. 되돌린다.
+      await this.storage.removeByUrl(url);
+      throw e;
+    }
+    // 새 사진이 확정된 뒤 예전 파일 정리 (다른 가족·계정이 쓰면 남긴다)
+    if (old && old !== url) {
+      await removeUnusedProfilePhotos(this.dataSource, this.storage, [old]);
+    }
+    return this.getOne(groupId);
+  }
+
+  // 이 가족에서 쓰는 내 사진 지우기 → 이니셜로 보인다
+  async removeMyPhoto(userId: string, groupId: string) {
+    const old = await this.memberships.setPhoto(userId, groupId, null);
+    await removeUnusedProfilePhotos(this.dataSource, this.storage, [old]);
+    return this.getOne(groupId);
   }
 
   // 내 호칭 수정 (멤버 검사는 GroupMemberGuard가 담당) → 갱신된 그룹 상세 반환

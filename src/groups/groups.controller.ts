@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,9 +8,17 @@ import {
   Patch,
   Post,
   Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { GroupMemberGuard } from './group-member.guard';
@@ -101,6 +110,34 @@ export class GroupsController {
     @Body() dto: UpdateNicknameDto,
   ) {
     return this.groups.updateMyNickname(user.id, id, dto.nickname);
+  }
+
+  // 이 가족에서 쓰는 내 프로필 사진 교체 (멤버만). 업로드+저장을 한 번에.
+  @Post(':id/me/photo')
+  @UseGuards(GroupMemberGuard)
+  @ApiOperation({ summary: '이 가족에서 쓰는 내 사진 교체 (multipart, field=file)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 8 * 1024 * 1024 }, // 8MB 제한 (계정 사진과 같음)
+      fileFilter: (_req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+    }),
+  )
+  updateMyPhoto(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('이미지 파일이 없습니다.');
+    return this.groups.updateMyPhoto(user.id, id, file);
+  }
+
+  // 이 가족에서 쓰는 내 사진 지우기 → 이니셜로 보인다 (멤버만)
+  @Delete(':id/me/photo')
+  @UseGuards(GroupMemberGuard)
+  @ApiOperation({ summary: '이 가족에서 쓰는 내 사진 지우기' })
+  removeMyPhoto(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.groups.removeMyPhoto(user.id, id);
   }
 
   // 초대 코드 발급 (멤버만 — GroupMemberGuard)

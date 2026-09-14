@@ -53,6 +53,15 @@ export class MembershipsService {
     return this.memberships.save(m);
   }
 
+  // 이 가족에서 쓰는 내 사진 바꾸기 (null = 지우기) → 예전 사진 주소를 돌려준다
+  async setPhoto(userId: string, groupId: string, photoUrl: string | null) {
+    const m = await this.assertMember(userId, groupId);
+    const old = m.photoUrl;
+    m.photoUrl = photoUrl;
+    await this.memberships.save(m);
+    return old;
+  }
+
   // 오늘의 한마디(무드) 설정 (그룹 멤버여야 함)
   async setMood(userId: string, groupId: string, text: string, emoji?: string) {
     const m = await this.assertMember(userId, groupId);

@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { Group } from '../entities/group.entity';
+import { Membership } from '../entities/membership.entity';
 import { Media } from '../entities/media.entity';
 import { Word } from '../entities/word.entity';
 import { PendingUpload } from '../entities/pending-upload.entity';
@@ -24,6 +25,11 @@ export async function removeGroupData(m: EntityManager, groupId: string) {
     if (w.photoUrl) urls.push(w.photoUrl);
   }
 
+  // 이 가족에서 쓰던 프로필 사진. 같은 사람의 다른 가족·계정이 같은 파일을 쓸 수 있어서
+  // 바로 지우지 않고 따로 돌려준다 → removeUnusedProfilePhotos
+  const members = await m.find(Membership, { where: { group: { id: groupId } } });
+  const profileUrls = members.map((mm) => mm.photoUrl).filter((u): u is string => !!u);
+
   // 올리다 만 파일 자리는 그룹과 FK 로 묶여 있지 않아 따로 지운다
   const pendings = await m.find(PendingUpload, { where: { groupId } });
   await m.delete(PendingUpload, { groupId });
@@ -31,5 +37,9 @@ export async function removeGroupData(m: EntityManager, groupId: string) {
   // 글·단어·문답·초대·멤버십은 FK CASCADE 로 함께 사라진다
   await m.delete(Group, { id: groupId });
 
-  return { urls: [...new Set(urls)], paths: pendings.map((p) => p.path) };
+  return {
+    urls: [...new Set(urls)],
+    paths: pendings.map((p) => p.path),
+    profileUrls,
+  };
 }
