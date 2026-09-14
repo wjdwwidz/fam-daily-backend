@@ -24,6 +24,11 @@ const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 const KAKAO_USER_URL = 'https://kapi.kakao.com/v2/user/me';
 const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
 
+// 서버가 카카오 API 를 부를 때 붙이는 언어. 운영 서버는 해외(Railway US)에 있고 브라우저가 아니라
+// 언어 헤더를 안 보내면, 로그인 알림(카카오톡 '카카오계정' 채널)이 영어로 올 수 있다.
+const KAKAO_LANG = 'ko';
+const KAKAO_LANG_HEADERS = { 'Accept-Language': 'ko-KR,ko;q=0.9' };
+
 // 카카오가 이름을 안 내려줄 때만 쓰는 임시 이름. 나중 로그인에서 실제 닉네임으로 교체된다.
 const KAKAO_FALLBACK_NAME = '카카오 사용자';
 
@@ -279,6 +284,8 @@ export class AuthService {
       client_id: this.config.getOrThrow<string>('KAKAO_REST_API_KEY'),
       redirect_uri: this.config.getOrThrow<string>('KAKAO_REDIRECT_URI'),
       response_type: 'code',
+      // 로그인·동의 화면 언어를 한국어로 고정 (기본은 브라우저 언어)
+      lang: KAKAO_LANG,
     });
     // 동의항목(scope)을 명시해야 카카오가 닉네임/프로필사진을 내려준다.
     // 단, 콘솔(카카오 로그인 > 동의항목)에서 활성화한 항목만 요청 가능 — 아니면 KOE205 로 로그인이 막힌다.
@@ -366,6 +373,7 @@ export class AuthService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        ...KAKAO_LANG_HEADERS,
       },
       body,
     });
@@ -382,7 +390,7 @@ export class AuthService {
   // access token으로 카카오 사용자 정보 조회
   private async fetchKakaoUser(accessToken: string): Promise<KakaoUser> {
     const res = await fetch(KAKAO_USER_URL, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}`, ...KAKAO_LANG_HEADERS },
     });
     if (!res.ok)
       throw new UnauthorizedException(
