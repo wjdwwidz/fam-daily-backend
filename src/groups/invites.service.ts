@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Invite } from '../entities/invite.entity';
@@ -13,7 +14,16 @@ import { Invite } from '../entities/invite.entity';
 export class InvitesService {
   constructor(
     @InjectRepository(Invite) private readonly invites: Repository<Invite>,
+    private readonly config: ConfigService,
   ) {}
+
+  // 초대 링크 = 웹 앱의 /join/코드. 누르면 로그인 뒤 코드가 채워진 참여 화면으로 간다.
+  // 주소는 환경변수로 둔다 — 웹 도메인이 바뀌어도 앱을 다시 빌드하지 않아도 되게.
+  // 설정 전에는 없는 주소를 보내지 않도록 링크를 비운다 (코드만 공유).
+  private inviteLink(code: string): string | null {
+    const base = this.config.get<string>('WEB_APP_URL')?.trim().replace(/\/+$/, '');
+    return base ? `${base}/join/${code}` : null;
+  }
 
   // 초대 코드 생성
   async create(groupId: string, expiresInDays?: string) {
@@ -29,7 +39,7 @@ export class InvitesService {
     );
     return {
       code: invite.code,
-      link: `우리끼리.app/join/${invite.code}`,
+      link: this.inviteLink(invite.code),
       expiresAt: invite.expiresAt,
     };
   }
