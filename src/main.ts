@@ -6,7 +6,8 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.setGlobalPrefix('api');
+  // 스토어에 등록하는 공개 문서(개인정보 처리방침·계정 삭제 안내)는 짧은 주소로 둔다
+  app.setGlobalPrefix('api', { exclude: ['privacy', 'account-deletion'] });
   app.enableCors(); // 앱(Expo)에서 호출 허용
   app.useGlobalPipes(
     new ValidationPipe({

@@ -8,6 +8,7 @@ import { WordsModule } from './words/words.module';
 import { MediaModule } from './media/media.module';
 import { QnaModule } from './qna/qna.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { LegalModule } from './legal/legal.module';
 import { AppController } from './app.controller';
 import { User } from './entities/user.entity';
 import { Group } from './entities/group.entity';
@@ -64,6 +65,7 @@ import { Answer } from './entities/answer.entity';
     MediaModule,
     QnaModule,
     UploadsModule,
+    LegalModule,
   ],
   controllers: [AppController],
 })
