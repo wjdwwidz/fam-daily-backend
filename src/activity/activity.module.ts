@@ -7,10 +7,11 @@ import { Media } from '../entities/media.entity';
 import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
+import { MediaComment } from '../entities/media-comment.entity';
 
-// 홈 '최근 활동' — 여러 기능(사전·일상·문답)의 기록을 읽기만 한다
+// 홈 '최근 활동' — 여러 기능(사전·일상·문답·댓글)의 기록을 읽기만 한다
 @Module({
-  imports: [TypeOrmModule.forFeature([Word, Media, Question, Answer, Membership])],
+  imports: [TypeOrmModule.forFeature([Word, Media, MediaComment, Question, Answer, Membership])],
   controllers: [ActivityController],
   providers: [ActivityService],
 })

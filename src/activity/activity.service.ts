@@ -1,13 +1,14 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Word } from '../entities/word.entity';
 import { Media } from '../entities/media.entity';
+import { MediaComment } from '../entities/media-comment.entity';
 import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
 
-export type ActivityType = 'word' | 'media' | 'question' | 'answer';
+export type ActivityType = 'word' | 'media' | 'question' | 'answer' | 'comment';
 
 export const DEFAULT_ACTIVITY_LIMIT = 5;
 const MAX_ACTIVITY_LIMIT = 20;
@@ -19,6 +20,8 @@ export class ActivityService {
     @InjectRepository(Media) private readonly media: Repository<Media>,
     @InjectRepository(Question) private readonly questions: Repository<Question>,
     @InjectRepository(Answer) private readonly answers: Repository<Answer>,
+    @InjectRepository(MediaComment)
+    private readonly comments: Repository<MediaComment>,
     @InjectRepository(Membership)
     private readonly memberships: Repository<Membership>,
   ) {}
@@ -31,7 +34,7 @@ export class ActivityService {
     await this.assertMember(userId, groupId);
     const take = Math.min(Math.max(1, limit), MAX_ACTIVITY_LIMIT);
 
-    const [words, media, questions, answers] = await Promise.all([
+    const [words, media, questions, answers, comments] = await Promise.all([
       this.words.find({
         where: { groupId },
         relations: { author: { user: true } },
@@ -57,6 +60,13 @@ export class ActivityService {
         order: { createdAt: 'DESC' },
         take,
       }),
+      // 일상 댓글 (내용을 지운 "삭제된 댓글"은 빼고)
+      this.comments.find({
+        where: { groupId, deletedAt: IsNull() },
+        relations: { author: { user: true } },
+        order: { createdAt: 'DESC' },
+        take,
+      }),
     ]);
 
     const items = [
@@ -69,6 +79,8 @@ export class ActivityService {
       ...answers.map((a) =>
         this.item('answer', a.id, a.questionId, a.question?.text ?? '', a.createdAt, a.author),
       ),
+      // 댓글은 댓글 내용을 보여주고, 누르면 그 일상 글로 → targetId 는 글
+      ...comments.map((c) => this.item('comment', c.id, c.mediaId, c.text, c.createdAt, c.author)),
     ];
     return items
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

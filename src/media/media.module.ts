@@ -8,13 +8,16 @@ import { PendingUpload } from '../entities/pending-upload.entity';
 import { UploadsModule } from '../uploads/uploads.module';
 import { SweepService } from './sweep.service';
 import { SweepController } from './sweep.controller';
+import { MediaComment } from '../entities/media-comment.entity';
+import { CommentsService } from './comments.service';
+import { CommentsController } from './comments.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Media, Membership, PendingUpload]),
+    TypeOrmModule.forFeature([Media, MediaComment, Membership, PendingUpload]),
     UploadsModule,
   ],
-  controllers: [MediaController, SweepController],
-  providers: [MediaService, SweepService],
+  controllers: [MediaController, CommentsController, SweepController],
+  providers: [MediaService, CommentsService, SweepService],
 })
 export class MediaModule {}
