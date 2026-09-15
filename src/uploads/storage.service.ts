@@ -8,6 +8,12 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import { extname } from 'path';
 
+// 올린 파일의 캐시 기간(초) — 1년.
+// 파일 이름이 매번 새로 만들어지고(시각+난수) 같은 이름으로 덮어쓰지 않으므로,
+// 한 번 받은 사진은 브라우저·CDN 이 다시 받지 않아도 된다. (Supabase 기본값은 1시간)
+// 앱이 스토리지로 직접 올리는 일상 사진(putToSignedUrl)도 같은 값을 쓴다.
+const FILE_CACHE_SECONDS = '31536000';
+
 // 파일 저장소 추상화 — 지금은 Supabase Storage. 나중에 R2/S3로 갈아끼우기 쉽게 한 곳에 모음.
 @Injectable()
 export class StorageService {
@@ -46,7 +52,11 @@ export class StorageService {
 
     const { error } = await this.client.storage
       .from(this.bucket)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+        cacheControl: FILE_CACHE_SECONDS,
+      });
     if (error) {
       this.logger.error(`Supabase 업로드 실패: ${error.message}`);
       throw new InternalServerErrorException('파일 업로드에 실패했습니다.');
