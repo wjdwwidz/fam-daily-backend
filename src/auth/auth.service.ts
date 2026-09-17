@@ -238,6 +238,7 @@ export class AuthService {
     try {
       url = new URL(redirect);
     } catch {
+      this.logger.warn(`[kakao] redirect 거부 — 주소 형식이 아님: ${redirect}`);
       throw new BadRequestException('허용되지 않은 redirect 주소입니다.');
     }
     // 설치된 앱의 딥링크 (app.json scheme)
@@ -256,6 +257,14 @@ export class AuthService {
     ) {
       return;
     }
+    // 거부 사유가 로그에 없으면 400 만 보고 원인을 짐작해야 한다. 무엇이 허용인지까지 남긴다.
+    const allowed = ['famdaily://', ...this.allowedWebOrigins()];
+    if (this.config.get<string>('ALLOW_EXPO_GO_REDIRECT') === 'true') {
+      allowed.push('exp://');
+    }
+    this.logger.warn(
+      `[kakao] redirect 거부 — 허용 목록에 없음: ${redirect} (허용: ${allowed.join(', ')})`,
+    );
     throw new BadRequestException('허용되지 않은 redirect 주소입니다.');
   }
 
@@ -311,6 +320,7 @@ export class AuthService {
     let user = await this.users.findOne({
       where: { provider: 'kakao', providerId },
     });
+    const isNew = !user;
 
     if (!user) {
       const email =
@@ -339,6 +349,9 @@ export class AuthService {
     }
 
     const safe = { id: user.id, email: user.email, name: user.name };
+    this.logger.log(
+      `[kakao] 로그인 성공 userId=${user.id} name=${user.name}${isNew ? ' (신규 가입)' : ''}`,
+    );
     return {
       user: { ...safe, photoUrl: user.photoUrl },
       accessToken: this.sign(safe),
@@ -379,12 +392,21 @@ export class AuthService {
       body,
     });
 
-    if (!res.ok)
+    // 실패하면 카카오가 본문에 이유를 준다 (KOE320=인가 코드 무효·재사용,
+    // KOE303=redirect_uri 불일치 등). 실패 응답엔 토큰이 없어 그대로 남겨도 안전하다.
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      this.logger.warn(
+        `[kakao] 토큰 교환 실패 status=${res.status} body=${detail.slice(0, 500)}`,
+      );
       throw new UnauthorizedException('카카오 토큰 교환에 실패했습니다.');
+    }
 
     const data = (await res.json()) as { access_token?: string };
-    if (!data.access_token)
+    if (!data.access_token) {
+      this.logger.warn('[kakao] 토큰 교환 응답에 access_token 이 없음');
       throw new UnauthorizedException('카카오 토큰 교환에 실패했습니다.');
+    }
     return data.access_token;
   }
 
@@ -393,10 +415,15 @@ export class AuthService {
     const res = await fetch(KAKAO_USER_URL, {
       headers: { Authorization: `Bearer ${accessToken}`, ...KAKAO_LANG_HEADERS },
     });
-    if (!res.ok)
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      this.logger.warn(
+        `[kakao] 사용자 정보 조회 실패 status=${res.status} body=${detail.slice(0, 500)}`,
+      );
       throw new UnauthorizedException(
         '카카오 사용자 정보 조회에 실패했습니다.',
       );
+    }
     const data = (await res.json()) as KakaoUser;
     // [임시 진단] 카카오가 실제로 내려주는 프로필 필드 확인
     this.logger.log(
