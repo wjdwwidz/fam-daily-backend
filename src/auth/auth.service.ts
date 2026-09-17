@@ -22,6 +22,7 @@ const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 const KAKAO_USER_URL = 'https://kapi.kakao.com/v2/user/me';
 const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
+const KAKAO_TOKEN_INFO_URL = 'https://kapi.kakao.com/v1/user/access_token_info';
 
 // 서버가 카카오 API 를 부를 때 붙이는 언어. 운영 서버는 해외(Railway US)에 있고 브라우저가 아니라
 // 언어 헤더를 안 보내면, 로그인 알림(카카오톡 '카카오계정' 채널)이 영어로 올 수 있다.
@@ -310,12 +311,56 @@ export class AuthService {
   async loginWithKakao(code: string) {
     const kakaoAccessToken = await this.exchangeKakaoToken(code);
     const kakaoUser = await this.fetchKakaoUser(kakaoAccessToken);
+    return this.issueForKakaoUser(kakaoUser, 'web');
+  }
 
+  // 앱(카카오 SDK) 로그인: 앱이 카카오톡에서 직접 받아온 액세스 토큰으로 바로 로그인한다.
+  // 인앱 브라우저를 거치지 않아, 커스텀탭 ↔ 카카오톡 전환에서 세션이 끊기는 문제가 없다.
+  async loginWithKakaoAccessToken(kakaoAccessToken: string) {
+    await this.assertTokenIsOurs(kakaoAccessToken);
+    const kakaoUser = await this.fetchKakaoUser(kakaoAccessToken);
+    return this.issueForKakaoUser(kakaoUser, 'app');
+  }
+
+  // 토큰은 앱이 보내주는 값이라 그대로 믿으면 안 된다. 남의 카카오 앱에서 받은 토큰으로도
+  // 사용자 정보 조회 자체는 성공하므로, 우리 앱이 발급한 토큰인지 앱 ID 로 확인한다.
+  private async assertTokenIsOurs(accessToken: string) {
+    const expected = this.config.get<string>('KAKAO_APP_ID');
+    if (!expected) {
+      this.logger.warn(
+        '[kakao] KAKAO_APP_ID 미설정 — 앱 토큰의 발급처를 검증하지 않고 진행',
+      );
+      return;
+    }
+    const res = await fetch(KAKAO_TOKEN_INFO_URL, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...KAKAO_LANG_HEADERS,
+      },
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      this.logger.warn(
+        `[kakao] 토큰 정보 조회 실패 status=${res.status} body=${detail.slice(0, 500)}`,
+      );
+      throw new UnauthorizedException('카카오 토큰이 유효하지 않습니다.');
+    }
+    const info = (await res.json()) as { app_id?: number };
+    if (String(info.app_id) !== String(expected)) {
+      this.logger.warn(
+        `[kakao] 다른 앱에서 발급된 토큰 거부 app_id=${info.app_id}`,
+      );
+      throw new UnauthorizedException('카카오 토큰이 유효하지 않습니다.');
+    }
+  }
+
+  // 웹·앱 공통: 카카오 사용자 정보로 우리 유저를 찾거나 만들고 JWT 를 발급한다.
+  private async issueForKakaoUser(kakaoUser: KakaoUser, via: 'web' | 'app') {
     const providerId = String(kakaoUser.id);
     const { nickname, photoUrl } = this.extractKakaoProfile(kakaoUser);
     // [임시 진단]
     this.logger.log(
-      `[kakao] 로그인 시도 providerId=${providerId} nickname=${nickname ?? 'null'} photo=${photoUrl ? 'yes' : 'no'}`,
+      `[kakao] 로그인 시도 via=${via} providerId=${providerId} nickname=${nickname ?? 'null'} photo=${photoUrl ? 'yes' : 'no'}`,
     );
     let user = await this.users.findOne({
       where: { provider: 'kakao', providerId },
@@ -350,7 +395,7 @@ export class AuthService {
 
     const safe = { id: user.id, email: user.email, name: user.name };
     this.logger.log(
-      `[kakao] 로그인 성공 userId=${user.id} name=${user.name}${isNew ? ' (신규 가입)' : ''}`,
+      `[kakao] 로그인 성공 via=${via} userId=${user.id} name=${user.name}${isNew ? ' (신규 가입)' : ''}`,
     );
     return {
       user: { ...safe, photoUrl: user.photoUrl },

@@ -25,6 +25,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser, type AuthUser } from './current-user.decorator';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { KakaoAppLoginDto } from './dto/kakao-app-login.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -61,6 +62,16 @@ export class AuthController {
     const sep = base.includes('?') ? '&' : '?';
     const url = `${base}${sep}token=${encodeURIComponent(accessToken)}`;
     return res.redirect(url);
+  }
+
+  // 앱(카카오 SDK)용. 웹은 위의 인가 코드 방식을 그대로 쓴다.
+  @Post('kakao/app')
+  @ApiOperation({
+    summary:
+      '카카오 앱 로그인 — 앱이 SDK 로 받은 카카오 액세스 토큰을 우리 JWT 로 교환',
+  })
+  kakaoAppLogin(@Body() dto: KakaoAppLoginDto) {
+    return this.auth.loginWithKakaoAccessToken(dto.accessToken);
   }
 
   @Get('success')
