@@ -11,10 +11,10 @@ import { Media } from '../entities/media.entity';
 import { Membership } from '../entities/membership.entity';
 import { SaveBucketDto } from './dto/bucket.dto';
 
-// 버킷리스트는 100칸이 한 장(page)이다. 한 장을 다 채우면 다음 장이 열린다.
+// 버킷리스트는 10칸이 한 장(page)이다. 한 장을 다 채우면 다음 장이 열린다.
 // 빈 칸은 행이 없고, 화면이 번호를 그린다.
-export const BUCKET_SIZE = 100;
-// 무한히 열리지는 않게 상한을 둔다 (가족이 100장을 채울 일은 없지만 잘못된 번호를 막는다)
+export const BUCKET_SIZE = 10;
+// 무한히 열리지는 않게 상한을 둔다 (잘못된 번호를 막기 위한 것)
 const MAX_PAGES = 100;
 
 @Injectable()
@@ -45,8 +45,14 @@ export class BucketService {
 
   // 1장은 늘 열려 있고, 앞 장을 빈칸 없이 다 채웠을 때만 다음 장이 열린다.
   // (달성 여부가 아니라 '채웠는지' 기준 — 달성은 천천히 해도 다음 장을 쓸 수 있게)
+  //
+  // 이미 적어둔 칸이 있으면 그 칸이 있는 장까지는 늘 열어둔다. 한 장 크기를 바꿔도
+  // 앞 장이 덜 찼다는 이유로 기존 칸이 손댈 수 없게 되면 안 된다.
   private unlockedPages(nos: number[]) {
     const filled = new Set(nos);
+    const reach = nos.length
+      ? Math.ceil(Math.max(...nos) / BUCKET_SIZE)
+      : 1;
     let pages = 1;
     while (pages < MAX_PAGES) {
       const start = (pages - 1) * BUCKET_SIZE + 1;
@@ -61,7 +67,7 @@ export class BucketService {
       if (!full) break;
       pages++;
     }
-    return pages;
+    return Math.max(pages, reach);
   }
 
   // 한 칸 쓰기/고치기. 같은 번호가 있으면 덮어쓴다.
@@ -140,7 +146,7 @@ export class BucketService {
     const limit = this.unlockedPages(nos.map((r) => r.no)) * BUCKET_SIZE;
     if (no > limit) {
       throw new BadRequestException(
-        `${limit}번까지 쓸 수 있어요. 앞의 칸을 모두 채우면 다음 100개가 열립니다.`,
+        `${limit}번까지 쓸 수 있어요. 앞의 칸을 모두 채우면 다음 ${BUCKET_SIZE}개가 열립니다.`,
       );
     }
   }
