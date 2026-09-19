@@ -46,8 +46,10 @@ export class MediaService {
   async prepareUpload(userId: string, groupId: string, dto: PrepareUploadDto) {
     await this.assertMember(userId, groupId);
     const rows = dto.files.map((f) => {
-      if (!/^(image|video)\//.test(f.contentType)) {
-        throw new BadRequestException('사진이나 영상만 올릴 수 있습니다.');
+      // 영상은 아직 받지 않는다 — 저장 공간(무료 플랜 1GB)을 금방 채우기 때문.
+      // 이미 올라간 영상은 그대로 보이고 재생된다. 유료 플랜으로 옮기면 열어준다.
+      if (!/^image\//.test(f.contentType)) {
+        throw new BadRequestException('지금은 사진만 올릴 수 있어요.');
       }
       if (f.size && f.size > MAX_FILE_SIZE) {
         throw new BadRequestException(
