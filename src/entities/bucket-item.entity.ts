@@ -27,6 +27,13 @@ export class BucketItem {
   @Column({ type: 'varchar', length: 30 })
   text: string;
 
+  // 누가 적었는지 (그룹 내 호칭). 탈퇴하면 null — 글·댓글처럼 호칭만 남는다.
+  @ManyToOne(() => Membership, { onDelete: 'SET NULL', nullable: true })
+  createdBy: Membership | null;
+
+  @Column({ nullable: true })
+  createdById: string | null;
+
   // 가족 공동 달성 — 누가 눌렀든 가족의 기록이다. 누른 사람은 doneBy 로 남긴다.
   @Column({ type: 'timestamptz', nullable: true })
   doneAt: Date | null;

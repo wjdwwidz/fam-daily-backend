@@ -1,14 +1,22 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Word } from '../entities/word.entity';
 import { Media } from '../entities/media.entity';
 import { MediaComment } from '../entities/media-comment.entity';
 import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
+import { BucketItem } from '../entities/bucket-item.entity';
 
-export type ActivityType = 'word' | 'media' | 'question' | 'answer' | 'comment';
+export type ActivityType =
+  | 'word'
+  | 'media'
+  | 'question'
+  | 'answer'
+  | 'comment'
+  | 'bucket'
+  | 'bucketDone';
 
 export const DEFAULT_ACTIVITY_LIMIT = 5;
 const MAX_ACTIVITY_LIMIT = 20;
@@ -24,6 +32,8 @@ export class ActivityService {
     private readonly comments: Repository<MediaComment>,
     @InjectRepository(Membership)
     private readonly memberships: Repository<Membership>,
+    @InjectRepository(BucketItem)
+    private readonly bucket: Repository<BucketItem>,
   ) {}
 
   // 가족의 최근 활동 — 사전 추가·일상 올림·질문·답변을 최신순으로 섞어서.
@@ -34,7 +44,8 @@ export class ActivityService {
     await this.assertMember(userId, groupId);
     const take = Math.min(Math.max(1, limit), MAX_ACTIVITY_LIMIT);
 
-    const [words, media, questions, answers, comments] = await Promise.all([
+    const [words, media, questions, answers, comments, bucket, bucketDone] =
+      await Promise.all([
       this.words.find({
         where: { groupId },
         relations: { author: { user: true } },
@@ -67,6 +78,19 @@ export class ActivityService {
         order: { createdAt: 'DESC' },
         take,
       }),
+      // 버킷리스트에 새로 적은 칸
+      this.bucket.find({
+        where: { groupId },
+        relations: { createdBy: { user: true } },
+        order: { createdAt: 'DESC' },
+        take,
+      }),
+      // 달성한 칸 — 누가 눌렀는지는 보여주지 않는다 (가족이 함께 이룬 일이므로)
+      this.bucket.find({
+        where: { groupId, doneAt: Not(IsNull()) },
+        order: { doneAt: 'DESC' },
+        take,
+      }),
     ]);
 
     const items = [
@@ -81,6 +105,14 @@ export class ActivityService {
       ),
       // 댓글은 댓글 내용을 보여주고, 누르면 그 일상 글로 → targetId 는 글
       ...comments.map((c) => this.item('comment', c.id, c.mediaId, c.text, c.createdAt, c.author)),
+      // 누르면 그 칸으로 → targetId 는 칸 번호
+      ...bucket.map((b) =>
+        this.item('bucket', b.id, String(b.no), b.text, b.createdAt, b.createdBy),
+      ),
+      // 달성은 작성자 없이 "n번을 달성했어요" 로만 보여준다
+      ...bucketDone.map((b) =>
+        this.item('bucketDone', `done-${b.id}`, String(b.no), b.text, b.doneAt!, null),
+      ),
     ];
     return items
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

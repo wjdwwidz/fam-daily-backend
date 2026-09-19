@@ -31,7 +31,7 @@ export class BucketService {
     await this.assertMember(userId, groupId);
     const rows = await this.items.find({
       where: { groupId },
-      relations: { doneBy: { user: true }, media: true },
+      relations: { createdBy: { user: true }, doneBy: { user: true }, media: true },
       order: { no: 'ASC' },
     });
     const pages = this.unlockedPages(rows.map((r) => r.no));
@@ -76,7 +76,8 @@ export class BucketService {
     await this.assertNo(groupId, no);
 
     let row = await this.items.findOne({ where: { groupId, no } });
-    if (!row) row = this.items.create({ groupId, no });
+    // 처음 적은 사람만 남긴다 — 나중에 남이 고쳐도 '누가 하고 싶다고 했는지'는 그대로
+    if (!row) row = this.items.create({ groupId, no, createdById: me.id });
     row.text = dto.text.trim();
 
     if (dto.done !== undefined) {
@@ -98,6 +99,43 @@ export class BucketService {
     return this.getOne(userId, groupId, no);
   }
 
+  // 칸을 다른 번호로 옮긴다 (우선순위 조정).
+  // 사이에 있던 칸들은 한 칸씩 밀린다 — 목록에서 끌어다 놓는 것과 같은 결과.
+  async move(userId: string, groupId: string, from: number, to: number) {
+    await this.assertMember(userId, groupId);
+    await this.assertNo(groupId, from);
+    await this.assertNo(groupId, to);
+    if (from === to) return this.list(userId, groupId);
+
+    const row = await this.items.findOne({ where: { groupId, no: from } });
+    if (!row) throw new NotFoundException('옮길 칸이 비어 있습니다.');
+
+    const lo = Math.min(from, to);
+    const hi = Math.max(from, to);
+    const shift = to > from ? -1 : 1;
+
+    // 번호는 (가족, 번호)로 유일해서 한 칸씩 옮기면 중간에 부딪힌다.
+    // 영향 구간을 한 번에 큰 수로 치워둔 뒤 제자리로 되돌린다.
+    const PARK = 1_000_000;
+    await this.items.manager.transaction(async (m) => {
+      await m.query(
+        `UPDATE "bucket_item" SET "no" = "no" + $1
+         WHERE "groupId" = $2 AND "no" BETWEEN $3 AND $4`,
+        [PARK, groupId, lo, hi],
+      );
+      await m.query(
+        `UPDATE "bucket_item" SET "no" = $1 WHERE "groupId" = $2 AND "no" = $3`,
+        [to, groupId, from + PARK],
+      );
+      await m.query(
+        `UPDATE "bucket_item" SET "no" = "no" - $1 + $2
+         WHERE "groupId" = $3 AND "no" > $1`,
+        [PARK, shift, groupId],
+      );
+    });
+    return this.list(userId, groupId);
+  }
+
   // 칸 비우기 (번호는 그대로 남고 내용만 사라진다)
   async remove(userId: string, groupId: string, no: number) {
     await this.assertMember(userId, groupId);
@@ -112,7 +150,7 @@ export class BucketService {
     await this.assertNo(groupId, no);
     const row = await this.items.findOne({
       where: { groupId, no },
-      relations: { doneBy: { user: true }, media: true },
+      relations: { createdBy: { user: true }, doneBy: { user: true }, media: true },
     });
     if (!row) throw new NotFoundException('아직 비어 있는 칸입니다.');
     return this.toDto(row);
@@ -122,6 +160,13 @@ export class BucketService {
     return {
       no: r.no,
       text: r.text,
+      createdBy: r.createdBy
+        ? {
+            nickname: r.createdBy.nickname,
+            name: r.createdBy.user?.name ?? '',
+            photoUrl: r.createdBy.photoUrl ?? null,
+          }
+        : null,
       done: !!r.doneAt,
       doneAt: r.doneAt,
       doneBy: r.doneBy

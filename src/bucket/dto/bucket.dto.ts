@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsInt,
+  Min,
   IsOptional,
   IsString,
   IsUUID,
@@ -25,4 +27,12 @@ export class SaveBucketDto {
   @IsOptional()
   @IsUUID()
   mediaId?: string | null;
+}
+
+// 칸을 다른 번호로 옮긴다 (우선순위 조정). 사이 칸들은 한 칸씩 밀린다.
+export class MoveBucketDto {
+  @ApiProperty({ example: 2, description: '옮길 번호' })
+  @IsInt()
+  @Min(1)
+  to: number;
 }

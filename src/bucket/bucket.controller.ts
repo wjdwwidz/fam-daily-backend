@@ -12,7 +12,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { BucketService } from './bucket.service';
-import { SaveBucketDto } from './dto/bucket.dto';
+import { MoveBucketDto, SaveBucketDto } from './dto/bucket.dto';
 
 @ApiTags('bucket')
 @ApiBearerAuth()
@@ -46,6 +46,17 @@ export class BucketController {
     @Body() dto: SaveBucketDto,
   ) {
     return this.bucket.save(user.id, groupId, no, dto);
+  }
+
+  @Put('groups/:groupId/bucket/:no/move')
+  @ApiOperation({ summary: '칸을 다른 번호로 옮기기 (우선순위 조정)' })
+  move(
+    @CurrentUser() user: AuthUser,
+    @Param('groupId') groupId: string,
+    @Param('no', ParseIntPipe) no: number,
+    @Body() dto: MoveBucketDto,
+  ) {
+    return this.bucket.move(user.id, groupId, no, dto.to);
   }
 
   @Delete('groups/:groupId/bucket/:no')
