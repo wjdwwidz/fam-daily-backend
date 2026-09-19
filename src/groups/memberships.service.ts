@@ -118,7 +118,10 @@ export class MembershipsService {
     return this.memberships.find({
       where: { user: { id: userId } },
       relations: { group: { memberships: { user: true } } },
-      order: { createdAt: 'ASC' },
+      // 가족 구성원도 가입순으로 정렬한다. 홈 무드 링은 배열 순서대로 자리를 잡는데,
+      // 상세(getGroup)는 가입순이고 여기만 정렬이 없으면 상세가 도착하는 순간
+      // 프로필 자리가 바뀐다.
+      order: { createdAt: 'ASC', group: { memberships: { createdAt: 'ASC' } } },
     });
   }
 }
