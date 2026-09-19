@@ -81,11 +81,13 @@ export class BucketService {
     row.text = dto.text.trim();
 
     if (dto.done !== undefined) {
-      // 이미 달성한 칸을 다시 저장할 때 달성 시각이 밀리지 않게, 상태가 바뀔 때만 손댄다
-      if (dto.done && !row.doneAt) {
-        row.doneAt = new Date();
-        row.doneById = me.id;
-      } else if (!dto.done) {
+      if (dto.done) {
+        // 이룬 날을 고른 경우 그 날로. 안 골랐으면 처음 체크할 때만 지금으로 잡고,
+        // 이미 달성한 칸을 다시 저장할 때는 날짜가 밀리지 않게 그대로 둔다.
+        if (dto.doneAt) row.doneAt = new Date(dto.doneAt);
+        else if (!row.doneAt) row.doneAt = new Date();
+        if (!row.doneById) row.doneById = me.id;
+      } else {
         row.doneAt = null;
         row.doneById = null;
       }

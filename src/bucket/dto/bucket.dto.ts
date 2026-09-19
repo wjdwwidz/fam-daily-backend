@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsDateString,
   IsInt,
   Min,
   IsOptional,
@@ -22,6 +23,15 @@ export class SaveBucketDto {
   @IsOptional()
   @IsBoolean()
   done?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      '이룬 날. 체크한 순간이 아니라 실제로 이룬 날을 고를 수 있다. 생략하면 지금.',
+    example: '2026-09-15',
+  })
+  @IsOptional()
+  @IsDateString()
+  doneAt?: string;
 
   @ApiPropertyOptional({ description: '이어붙일 일상 글 id. null 이면 연결 해제' })
   @IsOptional()
