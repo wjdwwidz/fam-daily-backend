@@ -14,6 +14,8 @@ import { StorageService } from '../uploads/storage.service';
 
 // 개당 최대 크기. 컨트롤러의 multipart 경로와 같은 값을 쓴다.
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+// 한 글에 붙일 수 있는 사진·영상 수 (DTO 의 ArrayMaxSize 와 같은 값)
+const MAX_ITEMS = 10;
 
 @Injectable()
 export class MediaService {
@@ -191,8 +193,11 @@ export class MediaService {
   //    반대로 하면 저장이 실패했을 때 이미 지운 옛 파일을 되돌릴 수 없다.
   //  - 저장이 실패하면 방금 올린 새 파일을 되돌린다. 안 그러면 아무도 참조하지
   //    않는 파일이 버킷에 남는다(고아 파일).
-  // 수정도 올리기와 같은 2단계를 쓴다. uploadIds 를 보내면 사진이 통째로
-  // 교체되고, 생략하면 글(caption)만 바뀐다.
+  // 수정도 올리기와 같은 2단계를 쓴다.
+  //   uploadIds 만      → 사진이 통째로 교체된다
+  //   keepUrls 만       → 거기 없는 기존 사진이 지워진다 (한 장씩 빼기)
+  //   둘 다             → 남긴 사진 뒤에 새 사진이 붙는다
+  //   둘 다 없음        → 글(caption)만 바뀐다
   async update(userId: string, mediaId: string, dto: UpdateMediaDto) {
     const row = await this.media.findOne({
       where: { id: mediaId },
@@ -206,15 +211,38 @@ export class MediaService {
 
     if (dto.caption !== undefined) row.caption = dto.caption;
 
-    // 사진을 새로 안 골랐으면 글만 바뀐다. 파일은 손대지 않으므로 정리할 것도 없다.
-    if (!dto.uploadIds?.length) {
+    // 사진을 건드리지 않았으면 글만 바뀐다. 파일은 그대로이므로 정리할 것도 없다.
+    if (!dto.uploadIds?.length && dto.keepUrls === undefined) {
       await this.media.save(row);
       return this.getOne(userId, mediaId);
     }
 
-    const ordered = await this.claimPendings(userId, row.groupId, dto.uploadIds);
-    const oldUrls = this.itemsOf(row).map((i) => i.url);
-    const items = this.toItems(ordered);
+    const existing = this.itemsOf(row);
+    // keepUrls 를 보냈으면 거기 있는 것만 남긴다. 안 보냈으면 기존 동작대로 통째 교체.
+    const kept =
+      dto.keepUrls === undefined
+        ? []
+        : existing.filter((i) => dto.keepUrls!.includes(i.url));
+
+    const ordered = dto.uploadIds?.length
+      ? await this.claimPendings(userId, row.groupId, dto.uploadIds)
+      : [];
+    const items = [...kept, ...this.toItems(ordered)];
+
+    if (!items.length) {
+      throw new BadRequestException('사진은 최소 한 장 남겨야 합니다.');
+    }
+    if (items.length > MAX_ITEMS) {
+      throw new BadRequestException(
+        `사진은 최대 ${MAX_ITEMS}개까지 올릴 수 있습니다.`,
+      );
+    }
+
+    // 남기지 않은 기존 파일만 지운다 (통째 교체면 기존 전부가 대상이 된다)
+    const keptUrls = new Set(kept.map((i) => i.url));
+    const removedUrls = existing
+      .map((i) => i.url)
+      .filter((url) => !keptUrls.has(url));
 
     // 교체와 pending 삭제를 한 트랜잭션으로. 나뉘면 스윕이 방금 붙인 파일을 지운다.
     await this.dataSource.transaction(async (m) => {
@@ -222,11 +250,13 @@ export class MediaService {
       // 예전 한 장짜리 컬럼은 더 이상 이 글을 대표하지 않는다
       row.photoUrl = null;
       await m.save(Media, row);
-      await m.delete(PendingUpload, { id: In(ordered.map((r) => r.id)) });
+      if (ordered.length) {
+        await m.delete(PendingUpload, { id: In(ordered.map((r) => r.id)) });
+      }
     });
 
-    // 교체가 DB 에 확정됐다. 이제 아무도 참조하지 않는 옛 파일을 지운다.
-    for (const url of oldUrls) await this.storage.removeByUrl(url);
+    // 변경이 DB 에 확정됐다. 이제 아무도 참조하지 않는 옛 파일을 지운다.
+    for (const url of removedUrls) await this.storage.removeByUrl(url);
     return this.getOne(userId, mediaId);
   }
 

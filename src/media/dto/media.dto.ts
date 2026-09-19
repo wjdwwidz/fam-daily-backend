@@ -68,6 +68,18 @@ export class UpdateMediaDto {
   @IsString({ each: true })
   uploadIds?: string[];
 
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      '남길 기존 사진의 url. 보내면 여기 없는 기존 사진은 지워진다. ' +
+      'uploadIds 와 함께 보내면 남긴 사진 뒤에 새 사진이 붙는다.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  keepUrls?: string[];
+
   @ApiPropertyOptional({ example: '오늘 저녁 산책' })
   @IsOptional()
   @IsString()
