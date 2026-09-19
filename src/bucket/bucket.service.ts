@@ -11,8 +11,11 @@ import { Media } from '../entities/media.entity';
 import { Membership } from '../entities/membership.entity';
 import { SaveBucketDto } from './dto/bucket.dto';
 
-// 버킷리스트는 1~100 번 칸으로 이루어진다. 빈 칸은 행이 없고, 화면이 1~100 을 그린다.
+// 버킷리스트는 100칸이 한 장(page)이다. 한 장을 다 채우면 다음 장이 열린다.
+// 빈 칸은 행이 없고, 화면이 번호를 그린다.
 export const BUCKET_SIZE = 100;
+// 무한히 열리지는 않게 상한을 둔다 (가족이 100장을 채울 일은 없지만 잘못된 번호를 막는다)
+const MAX_PAGES = 100;
 
 @Injectable()
 export class BucketService {
@@ -31,17 +34,40 @@ export class BucketService {
       relations: { doneBy: { user: true }, media: true },
       order: { no: 'ASC' },
     });
+    const pages = this.unlockedPages(rows.map((r) => r.no));
     return {
       size: BUCKET_SIZE,
+      pages,
       doneCount: rows.filter((r) => r.doneAt).length,
       items: rows.map((r) => this.toDto(r)),
     };
   }
 
+  // 1장은 늘 열려 있고, 앞 장을 빈칸 없이 다 채웠을 때만 다음 장이 열린다.
+  // (달성 여부가 아니라 '채웠는지' 기준 — 달성은 천천히 해도 다음 장을 쓸 수 있게)
+  private unlockedPages(nos: number[]) {
+    const filled = new Set(nos);
+    let pages = 1;
+    while (pages < MAX_PAGES) {
+      const start = (pages - 1) * BUCKET_SIZE + 1;
+      const end = pages * BUCKET_SIZE;
+      let full = true;
+      for (let n = start; n <= end; n++) {
+        if (!filled.has(n)) {
+          full = false;
+          break;
+        }
+      }
+      if (!full) break;
+      pages++;
+    }
+    return pages;
+  }
+
   // 한 칸 쓰기/고치기. 같은 번호가 있으면 덮어쓴다.
   async save(userId: string, groupId: string, no: number, dto: SaveBucketDto) {
     const me = await this.assertMember(userId, groupId);
-    this.assertNo(no);
+    await this.assertNo(groupId, no);
 
     let row = await this.items.findOne({ where: { groupId, no } });
     if (!row) row = this.items.create({ groupId, no });
@@ -69,7 +95,7 @@ export class BucketService {
   // 칸 비우기 (번호는 그대로 남고 내용만 사라진다)
   async remove(userId: string, groupId: string, no: number) {
     await this.assertMember(userId, groupId);
-    this.assertNo(no);
+    await this.assertNo(groupId, no);
     const row = await this.items.findOne({ where: { groupId, no } });
     if (row) await this.items.remove(row);
     return { no, text: null };
@@ -77,7 +103,7 @@ export class BucketService {
 
   async getOne(userId: string, groupId: string, no: number) {
     await this.assertMember(userId, groupId);
-    this.assertNo(no);
+    await this.assertNo(groupId, no);
     const row = await this.items.findOne({
       where: { groupId, no },
       relations: { doneBy: { user: true }, media: true },
@@ -105,9 +131,17 @@ export class BucketService {
     };
   }
 
-  private assertNo(no: number) {
-    if (!Number.isInteger(no) || no < 1 || no > BUCKET_SIZE) {
-      throw new BadRequestException(`번호는 1~${BUCKET_SIZE} 사이여야 합니다.`);
+  // 아직 열리지 않은 장의 번호는 막는다 — 1장을 비워둔 채 200번을 쓰지 못하게.
+  private async assertNo(groupId: string, no: number) {
+    if (!Number.isInteger(no) || no < 1) {
+      throw new BadRequestException('번호가 올바르지 않습니다.');
+    }
+    const nos = await this.items.find({ where: { groupId }, select: { no: true } });
+    const limit = this.unlockedPages(nos.map((r) => r.no)) * BUCKET_SIZE;
+    if (no > limit) {
+      throw new BadRequestException(
+        `${limit}번까지 쓸 수 있어요. 앞의 칸을 모두 채우면 다음 100개가 열립니다.`,
+      );
     }
   }
 
