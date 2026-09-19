@@ -31,7 +31,7 @@ export class Media {
   @Column({ type: 'text', default: '' })
   caption: string; // 이 순간을 한 줄로
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @ManyToOne(() => Group, { onDelete: 'CASCADE' })

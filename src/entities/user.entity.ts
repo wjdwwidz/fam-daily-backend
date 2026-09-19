@@ -30,7 +30,7 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   providerId: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @OneToMany(() => Membership, (m) => m.user)

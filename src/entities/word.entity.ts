@@ -36,10 +36,10 @@ export class Word {
   @Column({ type: 'varchar', nullable: true })
   photoUrl: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   // 어느 그룹의 단어인지

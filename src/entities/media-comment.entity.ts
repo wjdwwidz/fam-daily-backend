@@ -19,10 +19,10 @@ export class MediaComment {
   @Column({ type: 'text' })
   text: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   // 답글이 달린 댓글을 지우면 내용만 비우고 이 시각을 남긴다 ("삭제된 댓글이에요").

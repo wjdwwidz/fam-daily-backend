@@ -16,7 +16,7 @@ export class Invite {
   @Column({ unique: true })
   code: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true })

@@ -37,6 +37,6 @@ export class PendingUpload {
 
   // 오래된 것부터 훑는 쿼리가 주 용도
   @Index()
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

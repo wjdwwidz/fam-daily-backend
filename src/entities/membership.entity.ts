@@ -38,7 +38,7 @@ export class Membership {
   @Column({ type: 'varchar', length: 500, nullable: true })
   photoUrl: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   // 탈퇴하면 null. 멤버십은 지우지 않아서 그 사람이 남긴 글에 호칭이 계속 보인다.

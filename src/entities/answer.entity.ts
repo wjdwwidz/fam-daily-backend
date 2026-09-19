@@ -18,10 +18,10 @@ export class Answer {
   @Column({ type: 'text' })
   text: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   @ManyToOne(() => Question, (q) => q.answers, { onDelete: 'CASCADE' })

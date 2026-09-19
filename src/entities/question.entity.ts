@@ -19,7 +19,7 @@ export class Question {
   @Column({ type: 'text' })
   text: string; // 질문 내용
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   // 어느 그룹의 질문인지
