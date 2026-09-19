@@ -9,10 +9,15 @@ import { Group } from '../entities/group.entity';
 import { Role } from '../entities/role.enum';
 import { CreateGroupDto, JoinGroupDto, SetMoodDto } from './dto/group.dto';
 import { MembershipsService } from './memberships.service';
+import { Membership } from '../entities/membership.entity';
 import { InvitesService } from './invites.service';
 import { StorageService } from '../uploads/storage.service';
 import { removeUnusedProfilePhotos } from '../uploads/profile-photos';
 import { removeGroupData } from './group-removal';
+
+// 기록 화면이 한 번에 받아가는 줄 수 (한마디 + 프로필 사진 변경)
+const HISTORY_LIMIT = 50;
+const HISTORY_MAX = 200;
 
 @Injectable()
 export class GroupsService {
@@ -104,6 +109,49 @@ export class GroupsService {
   async setMyMood(userId: string, groupId: string, dto: SetMoodDto) {
     await this.memberships.setMood(userId, groupId, dto.text, dto.emoji);
     return this.getOne(groupId);
+  }
+
+  // 가족 기록 — 한마디와 프로필 사진 변경을 시간순으로 섞는다.
+  // 종류마다 최신 take 개만 가져와 합친 뒤 다시 take 개를 자른다 (최근 활동과 같은 방식).
+  async history(userId: string, groupId: string, limit = HISTORY_LIMIT) {
+    const take = Math.min(Math.max(1, limit), HISTORY_MAX);
+    const { moods, photos } = await this.memberships.listHistory(
+      userId,
+      groupId,
+      take,
+    );
+    const author = (a: Membership | null) =>
+      a
+        ? {
+            userId: a.user?.id ?? null,
+            nickname: a.nickname,
+            name: a.user?.name ?? '',
+            photoUrl: a.photoUrl ?? null,
+          }
+        : null;
+    const items = [
+      ...moods.map((m) => ({
+        type: 'mood' as const,
+        id: m.id,
+        text: m.text,
+        emoji: m.emoji,
+        photoUrl: null as string | null,
+        createdAt: m.createdAt,
+        author: author(m.author),
+      })),
+      ...photos.map((p) => ({
+        type: 'photo' as const,
+        id: p.id,
+        text: '',
+        emoji: null as string | null,
+        photoUrl: p.photoUrl,
+        createdAt: p.createdAt,
+        author: author(p.author),
+      })),
+    ];
+    return items
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, take);
   }
 
   // 그룹(가족) 이름 수정 — 방장(OWNER)만 → 갱신된 그룹 상세 반환

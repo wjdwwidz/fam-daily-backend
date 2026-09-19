@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -98,6 +99,19 @@ export class GroupsController {
     @Body() dto: SetMoodDto,
   ) {
     return this.groups.setMyMood(user.id, id, dto);
+  }
+
+  @Get(':id/history')
+  @UseGuards(GroupMemberGuard)
+  @ApiOperation({
+    summary: '가족 기록 — 한마디·프로필 사진 변경을 최신순으로 (멤버만)',
+  })
+  history(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.groups.history(user.id, id, Number(limit) || undefined);
   }
 
   // 내 호칭 수정 (멤버만 — GroupMemberGuard)

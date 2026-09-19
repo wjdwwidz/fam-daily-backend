@@ -7,6 +7,8 @@ import { Invite } from '../entities/invite.entity';
 import { Word } from '../entities/word.entity';
 import { Media } from '../entities/media.entity';
 import { MediaComment } from '../entities/media-comment.entity';
+import { MoodLog } from '../entities/mood-log.entity';
+import { ProfileLog } from '../entities/profile-log.entity';
 import { PendingUpload } from '../entities/pending-upload.entity';
 import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
@@ -24,7 +26,7 @@ export function typeOrmOptions(
     type: 'postgres' as const,
     entities: [
       User, Group, Membership, Invite, Word, Question, Answer,
-      Media, MediaComment, PendingUpload,
+      Media, MediaComment, PendingUpload, MoodLog, ProfileLog,
     ],
     migrations: [join(__dirname, '..', 'migrations', `*.${ext}`)],
     synchronize: false,
