@@ -17,7 +17,7 @@ export class ActivityController {
   constructor(private readonly activity: ActivityService) {}
 
   @Get('groups/:groupId/activity')
-  @ApiOperation({ summary: '가족 최근 활동 (사전 추가·일상·질문·답변, 최신순)' })
+  @ApiOperation({ summary: '가족 최근 활동 (사전 추가·일상·질문·답변·댓글·버킷·한마디, 최신순)' })
   @ApiQuery({ name: 'limit', required: false, example: DEFAULT_ACTIVITY_LIMIT })
   recent(
     @CurrentUser() user: AuthUser,

@@ -9,11 +9,12 @@ import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
 import { MediaComment } from '../entities/media-comment.entity';
 import { BucketItem } from '../entities/bucket-item.entity';
+import { MoodLog } from '../entities/mood-log.entity';
 
-// 홈 '최근 활동' — 여러 기능(사전·일상·문답·댓글)의 기록을 읽기만 한다
+// 홈 '최근 활동' — 여러 기능(사전·일상·문답·댓글·버킷·한마디)의 기록을 읽기만 한다
 @Module({
   imports: [TypeOrmModule.forFeature([
-      Word, Media, MediaComment, Question, Answer, Membership, BucketItem,
+      Word, Media, MediaComment, Question, Answer, Membership, BucketItem, MoodLog,
     ])],
   controllers: [ActivityController],
   providers: [ActivityService],

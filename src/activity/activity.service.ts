@@ -8,6 +8,7 @@ import { Question } from '../entities/question.entity';
 import { Answer } from '../entities/answer.entity';
 import { Membership } from '../entities/membership.entity';
 import { BucketItem } from '../entities/bucket-item.entity';
+import { MoodLog } from '../entities/mood-log.entity';
 
 export type ActivityType =
   | 'word'
@@ -16,7 +17,8 @@ export type ActivityType =
   | 'answer'
   | 'comment'
   | 'bucket'
-  | 'bucketDone';
+  | 'bucketDone'
+  | 'mood';
 
 export const DEFAULT_ACTIVITY_LIMIT = 5;
 const MAX_ACTIVITY_LIMIT = 20;
@@ -34,6 +36,8 @@ export class ActivityService {
     private readonly memberships: Repository<Membership>,
     @InjectRepository(BucketItem)
     private readonly bucket: Repository<BucketItem>,
+    @InjectRepository(MoodLog)
+    private readonly moods: Repository<MoodLog>,
   ) {}
 
   // 가족의 최근 활동 — 사전 추가·일상 올림·질문·답변을 최신순으로 섞어서.
@@ -44,7 +48,7 @@ export class ActivityService {
     await this.assertMember(userId, groupId);
     const take = Math.min(Math.max(1, limit), MAX_ACTIVITY_LIMIT);
 
-    const [words, media, questions, answers, comments, bucket, bucketDone] =
+    const [words, media, questions, answers, comments, bucket, bucketDone, moods] =
       await Promise.all([
       this.words.find({
         where: { groupId },
@@ -91,6 +95,13 @@ export class ActivityService {
         order: { doneAt: 'DESC' },
         take,
       }),
+      // 오늘의 한마디 — 바꿀 때마다 쌓이는 mood_log 에서 (지금 상태가 아니라 남긴 순간)
+      this.moods.find({
+        where: { groupId },
+        relations: { author: { user: true } },
+        order: { createdAt: 'DESC' },
+        take,
+      }),
     ]);
 
     const items = [
@@ -113,6 +124,11 @@ export class ActivityService {
       ...bucketDone.map((b) =>
         this.item('bucketDone', `done-${b.id}`, String(b.no), b.text, b.doneAt!, null),
       ),
+      // 한마디는 따로 열 화면이 없어 targetId 는 기록 자신. 이모지는 따로 내려준다
+      ...moods.map((m) => ({
+        ...this.item('mood', m.id, m.id, m.text, m.createdAt, m.author),
+        emoji: m.emoji,
+      })),
     ];
     return items
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
