@@ -189,6 +189,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
+      kakaoName: user.kakaoName,
       photoUrl: user.photoUrl,
     };
   }
@@ -226,6 +227,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
+      kakaoName: user.kakaoName,
       photoUrl: user.photoUrl,
     };
   }
@@ -374,6 +376,7 @@ export class AuthService {
         this.users.create({
           email,
           name: nickname ?? KAKAO_FALLBACK_NAME,
+          kakaoName: nickname,
           photoUrl,
           provider: 'kakao',
           providerId,
@@ -387,13 +390,15 @@ export class AuthService {
         patch.name = nickname;
       }
       if (photoUrl && !user.photoUrl) patch.photoUrl = photoUrl;
+      // 카카오 닉네임은 앱 이름과 달리 늘 카카오 값을 따른다 ('기본 이름')
+      if (nickname && nickname !== user.kakaoName) patch.kakaoName = nickname;
       if (Object.keys(patch).length > 0) {
         Object.assign(user, patch);
         await this.users.save(user);
       }
     }
 
-    const safe = { id: user.id, email: user.email, name: user.name };
+    const safe = { id: user.id, email: user.email, name: user.name, kakaoName: user.kakaoName };
     this.logger.log(
       `[kakao] 로그인 성공 via=${via} userId=${user.id} name=${user.name}${isNew ? ' (신규 가입)' : ''}`,
     );
