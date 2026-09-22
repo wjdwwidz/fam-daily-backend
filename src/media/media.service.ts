@@ -236,7 +236,7 @@ export class MediaService {
     }
     if (items.length > MAX_ITEMS) {
       throw new BadRequestException(
-        `사진은 최대 ${MAX_ITEMS}개까지 올릴 수 있습니다.`,
+        `사진은 최대 ${MAX_ITEMS}장까지 올릴 수 있습니다.`,
       );
     }
 
