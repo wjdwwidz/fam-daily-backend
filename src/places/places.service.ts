@@ -78,11 +78,15 @@ export class PlacesService {
       DEFAULT_DAILY_LIMIT;
     const used = await this.countToday();
     if (used > limit) {
+      // 처음 넘은 한 번만 남긴다 — 늘리려면 Railway 변수 PLACES_DAILY_LIMIT 를 올린다
+      // (150 을 넘기면 월 무료 한도 5,000회를 넘을 수 있어 요금이 나올 수 있다)
       if (used === limit + 1) {
-        this.logger.warn(`[places] 오늘 검색 한도(${limit}회)를 다 썼다`);
+        this.logger.warn(
+          `[places] 오늘 검색 한도(${limit}회)를 다 썼다 — 늘리려면 PLACES_DAILY_LIMIT 를 올린다`,
+        );
       }
       throw new HttpException(
-        '오늘은 장소 검색을 다 썼어요. 내일 다시 찾아주세요.',
+        `오늘 장소 검색 한도(${limit}회)를 다 썼어요. 관리자에게 요청해주세요. (내일이면 다시 찾을 수 있어요)`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
