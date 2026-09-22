@@ -5,12 +5,48 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+// 'YYYY-MM-DD' — 시각 없는 날짜만 받는다 (시각이 붙으면 시간대에 따라 하루가 밀린다)
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const YMD_MSG = '날짜는 YYYY-MM-DD 형식이어야 합니다.';
+
+// 구글 장소 검색에서 고른 곳 (GET /places/search 의 결과 한 줄을 그대로 보낸다)
+export class PlaceDto {
+  @ApiProperty({ example: '블루보틀 성수' })
+  @IsString()
+  @MaxLength(200)
+  name: string;
+
+  @ApiPropertyOptional({ example: '서울 성동구 아차산로 7' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @ApiPropertyOptional({ example: 'ChIJ...' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  placeId?: string;
+
+  @ApiPropertyOptional({ example: 37.5475 })
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @ApiPropertyOptional({ example: 127.0473 })
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+}
 
 export class PrepareFileDto {
   @ApiProperty({ example: 'image/jpeg' })
@@ -54,6 +90,28 @@ export class CommitUploadDto {
   @IsString()
   @MaxLength(300)
   caption?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-09-20',
+    description: '언제의 일인지 (시작일). 하루면 이것만',
+  })
+  @IsOptional()
+  @Matches(YMD, { message: YMD_MSG })
+  takenFrom?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-09-22',
+    description: '며칠 동안이면 끝나는 날',
+  })
+  @IsOptional()
+  @Matches(YMD, { message: YMD_MSG })
+  takenTo?: string;
+
+  @ApiPropertyOptional({ type: PlaceDto, description: '이 순간이 있었던 곳' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PlaceDto)
+  place?: PlaceDto;
 }
 
 export class UpdateMediaDto {
@@ -85,4 +143,28 @@ export class UpdateMediaDto {
   @IsString()
   @MaxLength(300)
   caption?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-09-20',
+    nullable: true,
+    description: '보내면 바뀐다. null 이면 날짜를 뺀다. 생략하면 그대로.',
+  })
+  @IsOptional()
+  @Matches(YMD, { message: YMD_MSG })
+  takenFrom?: string | null;
+
+  @ApiPropertyOptional({ example: '2026-09-22', nullable: true })
+  @IsOptional()
+  @Matches(YMD, { message: YMD_MSG })
+  takenTo?: string | null;
+
+  @ApiPropertyOptional({
+    type: PlaceDto,
+    nullable: true,
+    description: '보내면 바뀐다. null 이면 장소를 뺀다. 생략하면 그대로.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PlaceDto)
+  place?: PlaceDto | null;
 }
