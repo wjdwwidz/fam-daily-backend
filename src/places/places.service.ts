@@ -1,10 +1,13 @@
 import {
   BadGatewayException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 
 // 구글 장소 검색 (Places API (New) · Text Search).
 //
@@ -18,6 +21,9 @@ const SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
 const FIELD_MASK =
   'places.id,places.displayName,places.formattedAddress,places.location';
 const MAX_RESULTS = 8;
+// 하루 검색 한도. 150 × 31일 = 4,650회 — 구글 무료 한도(월 5,000회)를 넘지 않는다.
+// 구글 콘솔에서 하루 할당량을 걸 수 없어 서버에서 막는다. PLACES_DAILY_LIMIT 로 바꿀 수 있다.
+const DEFAULT_DAILY_LIMIT = 150;
 
 export type PlaceResult = {
   placeId: string;
@@ -40,7 +46,22 @@ type SearchTextResponse = {
 export class PlacesService {
   private readonly logger = new Logger(PlacesService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  // 오늘(한국 시간) 횟수에 1 을 더하고, 더한 뒤의 값을 돌려준다.
+  // 한 문장으로 더하고 읽어서, 가족이 동시에 검색해도 한 번씩 정확히 센다.
+  private async countToday(): Promise<number> {
+    const rows: { count: number }[] = await this.dataSource.query(
+      `INSERT INTO "places_usage" ("day", "count")
+       VALUES ((now() AT TIME ZONE 'Asia/Seoul')::date, 1)
+       ON CONFLICT ("day") DO UPDATE SET "count" = "places_usage"."count" + 1
+       RETURNING "count"`,
+    );
+    return Number(rows[0]?.count ?? 0);
+  }
 
   async search(query: string): Promise<PlaceResult[]> {
     const q = (query || '').trim().slice(0, 100);
@@ -49,6 +70,20 @@ export class PlacesService {
     if (!key) {
       throw new ServiceUnavailableException(
         '장소 검색이 아직 준비되지 않았어요.',
+      );
+    }
+    // 구글을 부르기 전에 센다 — 한도를 넘으면 부르지 않으니 요금도 없다
+    const limit =
+      Number(this.config.get<string>('PLACES_DAILY_LIMIT')) ||
+      DEFAULT_DAILY_LIMIT;
+    const used = await this.countToday();
+    if (used > limit) {
+      if (used === limit + 1) {
+        this.logger.warn(`[places] 오늘 검색 한도(${limit}회)를 다 썼다`);
+      }
+      throw new HttpException(
+        '오늘은 장소 검색을 다 썼어요. 내일 다시 찾아주세요.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
