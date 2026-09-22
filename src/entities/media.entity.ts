@@ -13,6 +13,16 @@ export type MediaItem = {
   type: 'image' | 'video';
 };
 
+// 이 순간이 있었던 곳 — 구글 장소 검색에서 고른 것. 누르면 구글 지도가 열린다.
+// placeId 가 있으면 지도가 그 가게를 정확히 연다. 좌표는 나중에 지도에 모아 보기 위해 남겨둔다.
+export type MediaPlace = {
+  name: string;
+  address?: string;
+  placeId?: string;
+  lat?: number;
+  lng?: number;
+};
+
 // 일상 게시글 — 특정 그룹에 속하고, 올린 사람(멤버십)에 연결됨
 @Entity()
 export class Media {
@@ -38,6 +48,9 @@ export class Media {
 
   @Column({ type: 'date', nullable: true })
   takenTo: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  place: MediaPlace | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

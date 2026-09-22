@@ -11,6 +11,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { LegalModule } from './legal/legal.module';
 import { ActivityModule } from './activity/activity.module';
 import { BucketModule } from './bucket/bucket.module';
+import { PlacesModule } from './places/places.module';
 import { AppController } from './app.controller';
 import { typeOrmOptions } from './database/typeorm-options';
 
@@ -42,6 +43,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     LegalModule,
     ActivityModule,
     BucketModule,
+    PlacesModule,
   ],
   controllers: [AppController],
 })

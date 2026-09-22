@@ -135,6 +135,7 @@ export class MediaService {
           items,
           caption: dto.caption ?? '',
           ...takenRange(dto.takenFrom, dto.takenTo),
+          place: dto.place ?? null,
           groupId,
           authorId: membership.id,
         }),
@@ -213,7 +214,7 @@ export class MediaService {
   //   uploadIds 만      → 사진이 통째로 교체된다
   //   keepUrls 만       → 거기 없는 기존 사진이 지워진다 (한 장씩 빼기)
   //   둘 다             → 남긴 사진 뒤에 새 사진이 붙는다
-  //   둘 다 없음        → 글(caption)·날짜만 바뀐다
+  //   둘 다 없음        → 글(caption)·날짜·장소만 바뀐다
   async update(userId: string, mediaId: string, dto: UpdateMediaDto) {
     const row = await this.media.findOne({
       where: { id: mediaId },
@@ -230,6 +231,8 @@ export class MediaService {
     if (dto.takenFrom !== undefined || dto.takenTo !== undefined) {
       Object.assign(row, takenRange(dto.takenFrom, dto.takenTo));
     }
+    // 생략하면 그대로, null 이면 장소를 뺀다
+    if (dto.place !== undefined) row.place = dto.place ?? null;
 
     // 사진을 건드리지 않았으면 글만 바뀐다. 파일은 그대로이므로 정리할 것도 없다.
     if (!dto.uploadIds?.length && dto.keepUrls === undefined) {
@@ -322,6 +325,7 @@ export class MediaService {
       // 언제의 일인지 ('YYYY-MM-DD'). 없으면 null — 앱은 이때 날짜 줄을 그리지 않는다
       takenFrom: m.takenFrom ?? null,
       takenTo: m.takenTo ?? null,
+      place: m.place ?? null,
       createdAt: m.createdAt,
       author: m.author
         ? {
