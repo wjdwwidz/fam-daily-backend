@@ -80,6 +80,13 @@ export class PlacesService {
     if (used > limit) {
       // 처음 넘은 한 번만 남긴다 — 늘리려면 Railway 변수 PLACES_DAILY_LIMIT 를 올린다
       // (150 을 넘기면 월 무료 한도 5,000회를 넘을 수 있어 요금이 나올 수 있다)
+      // TODO: 여기서 관리자 카카오톡으로 바로 알림 ('나에게 보내기').
+      //   1) 카카오 개발자 콘솔 동의항목에 '카카오톡 메시지 전송(talk_message)' 켜기
+      //   2) 관리자가 그 권한으로 한 번 로그인해 리프레시 토큰을 받는 관리자 전용 주소
+      //   3) 토큰을 Railway 변수에 두고, POST kapi.kakao.com/v2/api/talk/memo/default/send
+      //   4) 리프레시 토큰도 두 달이면 만료 — 한 달에 한 번 갱신하는 스케줄 작업을 같이 둔다
+      //   알림이 실패해도 검색 응답(429)에는 영향이 없게 기다리지 않고 보낸다.
+      //   더 간단한 대안: 디스코드/텔레그램 웹훅 (토큰 만료 없음)
       if (used === limit + 1) {
         this.logger.warn(
           `[places] 오늘 검색 한도(${limit}회)를 다 썼다 — 늘리려면 PLACES_DAILY_LIMIT 를 올린다`,
