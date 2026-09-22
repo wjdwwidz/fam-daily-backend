@@ -17,6 +17,19 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 // 한 글에 붙일 수 있는 사진·영상 수 (DTO 의 ArrayMaxSize 와 같은 값)
 const MAX_ITEMS = 10;
 
+// 일상 날짜 한 쌍을 정리한다.
+//  - 끝만 오면 그 하루로 (시작=끝)
+//  - 시작과 끝이 같으면 하루 — 끝은 비운다
+//  - 끝이 시작보다 앞이면 거절 (앱은 애초에 그렇게 못 고르게 한다)
+function takenRange(from?: string | null, to?: string | null) {
+  const start = from || to || null;
+  const end = from && to && to !== from ? to : null;
+  if (start && end && end < start) {
+    throw new BadRequestException('끝나는 날이 시작하는 날보다 앞이에요.');
+  }
+  return { takenFrom: start, takenTo: end };
+}
+
 @Injectable()
 export class MediaService {
   constructor(
@@ -121,6 +134,7 @@ export class MediaService {
         m.create(Media, {
           items,
           caption: dto.caption ?? '',
+          ...takenRange(dto.takenFrom, dto.takenTo),
           groupId,
           authorId: membership.id,
         }),
@@ -199,7 +213,7 @@ export class MediaService {
   //   uploadIds 만      → 사진이 통째로 교체된다
   //   keepUrls 만       → 거기 없는 기존 사진이 지워진다 (한 장씩 빼기)
   //   둘 다             → 남긴 사진 뒤에 새 사진이 붙는다
-  //   둘 다 없음        → 글(caption)만 바뀐다
+  //   둘 다 없음        → 글(caption)·날짜만 바뀐다
   async update(userId: string, mediaId: string, dto: UpdateMediaDto) {
     const row = await this.media.findOne({
       where: { id: mediaId },
@@ -212,6 +226,10 @@ export class MediaService {
     }
 
     if (dto.caption !== undefined) row.caption = dto.caption;
+    // 날짜는 시작·끝을 한 쌍으로 다룬다 — 둘 중 하나라도 보내면 둘 다 새 값으로 (빠진 쪽은 비움)
+    if (dto.takenFrom !== undefined || dto.takenTo !== undefined) {
+      Object.assign(row, takenRange(dto.takenFrom, dto.takenTo));
+    }
 
     // 사진을 건드리지 않았으면 글만 바뀐다. 파일은 그대로이므로 정리할 것도 없다.
     if (!dto.uploadIds?.length && dto.keepUrls === undefined) {
@@ -301,6 +319,9 @@ export class MediaService {
       // 목록에서 대표로 쓸 첫 장
       coverUrl: items[0]?.url ?? null,
       caption: m.caption,
+      // 언제의 일인지 ('YYYY-MM-DD'). 없으면 null — 앱은 이때 날짜 줄을 그리지 않는다
+      takenFrom: m.takenFrom ?? null,
+      takenTo: m.takenTo ?? null,
       createdAt: m.createdAt,
       author: m.author
         ? {

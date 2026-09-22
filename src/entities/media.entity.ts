@@ -31,6 +31,14 @@ export class Media {
   @Column({ type: 'text', default: '' })
   caption: string; // 이 순간을 한 줄로
 
+  // 언제의 일인지 — 올린 날과 다를 수 있다 (여행 다녀와서 올리기 등). 고르지 않으면 null.
+  // 하루면 takenFrom 만, 며칠이면 takenTo 까지. 시각 없는 날짜(date)라 시간대로 하루 밀리지 않는다.
+  @Column({ type: 'date', nullable: true })
+  takenFrom: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  takenTo: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
