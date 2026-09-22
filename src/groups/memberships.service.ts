@@ -6,6 +6,9 @@ import { MoodLog } from '../entities/mood-log.entity';
 import { ProfileLog } from '../entities/profile-log.entity';
 import { Role } from '../entities/role.enum';
 
+// 같은 내용의 한마디가 이 시간 안에 또 오면 중복으로 보고 기록하지 않는다
+const DUPLICATE_MOOD_MS = 10_000;
+
 // 멤버십(유저↔그룹) 관련 로직 — 다른 기능에서도 재사용되는 멤버 검사/생성/조회
 @Injectable()
 export class MembershipsService {
@@ -84,14 +87,27 @@ export class MembershipsService {
     const saved = await this.memberships.save(m);
     const body = (text || '').trim();
     if (body) {
-      await this.moodLogs.save(
-        this.moodLogs.create({
-          text: body,
-          emoji: emoji ?? null,
-          groupId,
-          authorId: m.id,
-        }),
-      );
+      // 같은 사람이 같은 내용을 연달아 보내면 기록을 한 줄로 둔다.
+      // 앱에서 Enter 와 전송 버튼이 둘 다 들어와 두 줄이 남은 적이 있다.
+      const last = await this.moodLogs.findOne({
+        where: { authorId: m.id },
+        order: { createdAt: 'DESC' },
+      });
+      const justNow =
+        last &&
+        last.text === body &&
+        (last.emoji ?? null) === (emoji ?? null) &&
+        Date.now() - last.createdAt.getTime() < DUPLICATE_MOOD_MS;
+      if (!justNow) {
+        await this.moodLogs.save(
+          this.moodLogs.create({
+            text: body,
+            emoji: emoji ?? null,
+            groupId,
+            authorId: m.id,
+          }),
+        );
+      }
     }
     return saved;
   }
