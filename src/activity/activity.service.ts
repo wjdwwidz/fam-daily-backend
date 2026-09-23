@@ -21,7 +21,8 @@ export type ActivityType =
   | 'mood';
 
 export const DEFAULT_ACTIVITY_LIMIT = 5;
-const MAX_ACTIVITY_LIMIT = 20;
+// 홈은 5개만 보여주고, '더보기' 화면이 최대치까지 받아 간다
+const MAX_ACTIVITY_LIMIT = 60;
 
 @Injectable()
 export class ActivityService {

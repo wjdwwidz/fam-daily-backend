@@ -12,6 +12,7 @@ import { LegalModule } from './legal/legal.module';
 import { ActivityModule } from './activity/activity.module';
 import { BucketModule } from './bucket/bucket.module';
 import { PlacesModule } from './places/places.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AppController } from './app.controller';
 import { typeOrmOptions } from './database/typeorm-options';
 
@@ -44,6 +45,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     ActivityModule,
     BucketModule,
     PlacesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
 })

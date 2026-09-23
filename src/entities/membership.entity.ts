@@ -38,6 +38,11 @@ export class Membership {
   @Column({ type: 'varchar', length: 500, nullable: true })
   photoUrl: string | null;
 
+  // 알림(내 글 댓글·내 댓글 답글)을 마지막으로 본 시각. 이보다 뒤에 온 것이 '안 읽음'.
+  // 알림 화면을 열면 갱신한다. null 이면 아직 한 번도 안 열어본 것.
+  @Column({ type: 'timestamptz', nullable: true })
+  notificationsSeenAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
