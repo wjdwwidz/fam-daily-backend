@@ -5,7 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import {
+  Between,
+  IsNull,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import { Event } from '../entities/event.entity';
 import { Membership } from '../entities/membership.entity';
 import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
@@ -29,8 +35,8 @@ export class EventsService {
       where:
         from && to
           ? [
-              // 하루짜리: 시작일이 기간 안
-              { ...where, endDate: undefined, startDate: Between(from, to) },
+              // 하루짜리(끝나는 날 없음): 시작일이 기간 안
+              { ...where, endDate: IsNull(), startDate: Between(from, to) },
               // 기간짜리: 시작 <= to 이고 끝 >= from (겹치면 보여준다)
               {
                 ...where,
