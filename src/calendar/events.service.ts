@@ -96,7 +96,7 @@ export class EventsService {
       .addSelect(['createdByUser.id', 'createdByUser.name'])
       .where('e.groupId = :groupId', { groupId })
       .andWhere('e.isDday = true')
-      .take(100)
+      .take(300)
       .getMany();
 
     // 매년 반복하는 일정은 다음 차례까지 센다 (지난 생일이 아니라 올해·내년 생일).
@@ -117,7 +117,7 @@ export class EventsService {
       .filter((x) => done(x) && x.e.ddayMode !== 'dday')
       .sort((a, b) => (a.o.startDate > b.o.startDate ? -1 : 1));
     return [...upcoming, ...past]
-      .slice(0, Math.min(Math.max(1, limit), 10))
+      .slice(0, Math.min(Math.max(1, limit), 100))
       .map((x) => this.serialize(x.e, x.o));
   }
 
