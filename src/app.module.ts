@@ -13,6 +13,7 @@ import { ActivityModule } from './activity/activity.module';
 import { BucketModule } from './bucket/bucket.module';
 import { PlacesModule } from './places/places.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { CalendarModule } from './calendar/calendar.module';
 import { AppController } from './app.controller';
 import { typeOrmOptions } from './database/typeorm-options';
 
@@ -46,6 +47,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     BucketModule,
     PlacesModule,
     NotificationsModule,
+    CalendarModule,
   ],
   controllers: [AppController],
 })
