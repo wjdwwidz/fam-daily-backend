@@ -43,6 +43,24 @@ export class EventsController {
     return this.events.list(user.id, groupId, from, to);
   }
 
+  @Get('groups/:groupId/events/dday')
+  @ApiOperation({
+    summary: '홈에 띄울 D-day 일정 — 아직 안 지난 것만 가까운 순',
+  })
+  @ApiQuery({ name: 'limit', required: false, example: 3 })
+  dday(
+    @CurrentUser() user: AuthUser,
+    @Param('groupId') groupId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = Number(limit);
+    return this.events.upcomingDday(
+      user.id,
+      groupId,
+      Number.isFinite(n) && n > 0 ? Math.floor(n) : 3,
+    );
+  }
+
   @Post('groups/:groupId/events')
   @ApiOperation({ summary: '일정 추가 (가족 누구나)' })
   create(

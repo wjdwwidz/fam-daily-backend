@@ -31,6 +31,20 @@ export class Event {
   @Column({ type: 'varchar', length: 20, nullable: true })
   category: string | null;
 
+  // 해마다 같은 날 돌아오는 일정 (생일·기념일).
+  // 달력에는 보고 있는 해의 날짜로, 홈 D-day 는 다음 차례까지 센다.
+  @Column({ type: 'boolean', default: false })
+  repeatYearly: boolean;
+
+  // 홈에 띄울지. 켠 일정만 홈에 보인다.
+  @Column({ type: 'boolean', default: false })
+  isDday: boolean;
+
+  // 세는 방법 — 'dday'(남은 날), 'count'(지난 날수), 'week'(주수).
+  // 남은 날은 지나면 홈에서 빠지지만, 지난 날수·주수는 계속 센다 (100일·12주차처럼).
+  @Column({ type: 'varchar', length: 10, default: 'dday' })
+  ddayMode: string;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

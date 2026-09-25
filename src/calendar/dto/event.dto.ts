@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
+
+// 세는 방법 — 남은 날 / 지난 날수 / 주수
+export const DDAY_MODES = ['dday', 'count', 'week'] as const;
 
 // 'YYYY-MM-DD' — 시각 없는 날짜만 받는다 (시각이 붙으면 시간대에 따라 하루가 밀린다)
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +41,28 @@ export class CreateEventDto {
   @IsString()
   @MaxLength(20)
   category?: string | null;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: '해마다 같은 날 돌아오는 일정인지',
+  })
+  @IsOptional()
+  @IsBoolean()
+  repeatYearly?: boolean;
+
+  @ApiPropertyOptional({ example: true, description: '홈에 D-day 로 띄울지' })
+  @IsOptional()
+  @IsBoolean()
+  isDday?: boolean;
+
+  @ApiPropertyOptional({
+    enum: DDAY_MODES,
+    example: 'dday',
+    description: 'dday=남은 날, count=지난 날수, week=주수',
+  })
+  @IsOptional()
+  @IsIn(DDAY_MODES)
+  ddayMode?: string;
 }
 
 // 보낸 것만 바뀐다. endDate 를 null 로 보내면 '하루짜리' 가 된다.
@@ -56,4 +88,19 @@ export class UpdateEventDto {
   @IsString()
   @MaxLength(20)
   category?: string | null;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  repeatYearly?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isDday?: boolean;
+
+  @ApiPropertyOptional({ enum: DDAY_MODES, example: 'dday' })
+  @IsOptional()
+  @IsIn(DDAY_MODES)
+  ddayMode?: string;
 }
