@@ -129,8 +129,8 @@ export class UpdateMediaDto {
   @ApiPropertyOptional({
     type: [String],
     description:
-      '남길 기존 사진의 url. 보내면 여기 없는 기존 사진은 지워진다. ' +
-      'uploadIds 와 함께 보내면 남긴 사진 뒤에 새 사진이 붙는다.',
+      '남길 기존 사진의 url — 보낸 순서가 그대로 저장된다. ' +
+      '여기 없는 기존 사진은 지워지고, uploadIds 를 함께 보내면 뒤에 새 사진이 붙는다.',
   })
   @IsOptional()
   @IsArray()

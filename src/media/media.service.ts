@@ -213,7 +213,7 @@ export class MediaService {
   // 수정도 올리기와 같은 2단계를 쓴다.
   //   uploadIds 만      → 사진이 통째로 교체된다
   //   keepUrls 만       → 거기 없는 기존 사진이 지워진다 (한 장씩 빼기)
-  //   둘 다             → 남긴 사진 뒤에 새 사진이 붙는다
+  //   둘 다             → 남긴 사진(보낸 순서대로) 뒤에 새 사진이 붙는다
   //   둘 다 없음        → 글(caption)·날짜·장소만 바뀐다
   async update(userId: string, mediaId: string, dto: UpdateMediaDto) {
     const row = await this.media.findOne({
@@ -241,11 +241,14 @@ export class MediaService {
     }
 
     const existing = this.itemsOf(row);
-    // keepUrls 를 보냈으면 거기 있는 것만 남긴다. 안 보냈으면 기존 동작대로 통째 교체.
+    // keepUrls 를 보냈으면 거기 있는 것만, 보낸 순서대로 남긴다 (앱에서 순서를 바꿀 수 있다).
+    // 안 보냈으면 기존 동작대로 통째 교체.
     const kept =
       dto.keepUrls === undefined
         ? []
-        : existing.filter((i) => dto.keepUrls!.includes(i.url));
+        : dto.keepUrls
+            .map((url) => existing.find((i) => i.url === url))
+            .filter((i): i is (typeof existing)[number] => !!i);
 
     const ordered = dto.uploadIds?.length
       ? await this.claimPendings(userId, row.groupId, dto.uploadIds)
