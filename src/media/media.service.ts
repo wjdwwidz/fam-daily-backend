@@ -114,6 +114,29 @@ export class MediaService {
     return ordered;
   }
 
+  // order 는 '남긴 사진의 url' 과 '새로 올린 uploadId' 가 섞인 최종 순서.
+  // 모르는 값은 건너뛰고, order 에 빠진 사진은 잃지 않게 뒤에 붙인다.
+  private inOrder(
+    order: string[],
+    kept: MediaItem[],
+    pendings: PendingUpload[],
+    added: MediaItem[],
+  ): MediaItem[] {
+    const byUrl = new Map(kept.map((i) => [i.url, i]));
+    const byUploadId = new Map(pendings.map((r, i) => [r.id, added[i]]));
+    const picked: MediaItem[] = [];
+    const seen = new Set<MediaItem>();
+    for (const key of order) {
+      const it = byUrl.get(key) ?? byUploadId.get(key);
+      if (it && !seen.has(it)) {
+        picked.push(it);
+        seen.add(it);
+      }
+    }
+    const rest = [...kept, ...added].filter((i) => !seen.has(i));
+    return [...picked, ...rest];
+  }
+
   private toItems(rows: PendingUpload[]): MediaItem[] {
     return rows.map((r) => ({
       url: this.storage.publicUrlFor(r.path),
@@ -253,7 +276,12 @@ export class MediaService {
     const ordered = dto.uploadIds?.length
       ? await this.claimPendings(userId, row.groupId, dto.uploadIds)
       : [];
-    const items = [...kept, ...this.toItems(ordered)];
+    const added = this.toItems(ordered);
+    // order 를 보내면 기존 사진과 새 사진을 섞어 그 순서대로 놓는다.
+    // (안 보내면 예전처럼 '남긴 사진 뒤에 새 사진')
+    const items = dto.order?.length
+      ? this.inOrder(dto.order, kept, ordered, added)
+      : [...kept, ...added];
 
     if (!items.length) {
       throw new BadRequestException('사진은 최소 한 장 남겨야 합니다.');

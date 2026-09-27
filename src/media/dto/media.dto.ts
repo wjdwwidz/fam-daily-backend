@@ -138,6 +138,18 @@ export class UpdateMediaDto {
   @IsString({ each: true })
   keepUrls?: string[];
 
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      '최종 순서. 남길 사진의 url 과 새로 올린 uploadId 를 섞어 보낸다. ' +
+      '보내면 기존 사진과 새 사진을 섞어 놓을 수 있다.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  order?: string[];
+
   @ApiPropertyOptional({ example: '오늘 저녁 산책' })
   @IsOptional()
   @IsString()
