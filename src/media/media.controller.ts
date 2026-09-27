@@ -26,7 +26,7 @@ import { CommitUploadDto, PrepareUploadDto, UpdateMediaDto } from './dto/media.d
 
 // 한 글에 담을 수 있는 최대 개수와 개당 크기.
 // 메모리 버퍼링이라 이 둘의 곱이 곧 최악의 순간 메모리 사용량이다.
-const MAX_FILES = 10;
+const MAX_FILES = 20;
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
 @ApiTags('media')

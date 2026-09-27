@@ -15,7 +15,7 @@ import { StorageService } from '../uploads/storage.service';
 // 개당 최대 크기. 컨트롤러의 multipart 경로와 같은 값을 쓴다.
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 // 한 글에 붙일 수 있는 사진·영상 수 (DTO 의 ArrayMaxSize 와 같은 값)
-const MAX_ITEMS = 10;
+const MAX_ITEMS = 20;
 
 // 일상 날짜 한 쌍을 정리한다.
 //  - 끝만 오면 그 하루로 (시작=끝)

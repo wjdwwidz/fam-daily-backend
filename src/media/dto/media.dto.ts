@@ -71,7 +71,7 @@ export class PrepareUploadDto {
   @ApiProperty({ type: [PrepareFileDto] })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => PrepareFileDto)
   files: PrepareFileDto[];
@@ -81,7 +81,7 @@ export class CommitUploadDto {
   @ApiProperty({ type: [String], description: 'prepare 가 돌려준 uploadId 들' })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   uploadIds: string[];
 
@@ -122,7 +122,7 @@ export class UpdateMediaDto {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   uploadIds?: string[];
 
@@ -134,7 +134,7 @@ export class UpdateMediaDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   keepUrls?: string[];
 
