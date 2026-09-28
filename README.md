@@ -35,9 +35,9 @@
 버킷리스트는 빈 번호 칸을 골라 하고 싶은 일을 적습니다.
 이룬 칸은 체크하고 그날의 일상 글을 연결하면, 목록에 사진이 함께 붙습니다.
 
-| 달력 | 일정 추가 | 추가한 뒤 |
-|---|---|---|
-| <img src="docs/images/calendar.jpg" alt="가족 일정이 표시된 월간 달력" width="240"> | <img src="docs/images/event-add.jpg" alt="날짜, D-day, 색상을 고르는 일정 추가 시트" width="240"> | <img src="docs/images/event-added.jpg" alt="오늘 날짜에 새 일정이 표시된 달력" width="240"> |
+| 달력 | 일정 추가 |
+|---|---|
+| <img src="docs/images/calendar.jpg" alt="가족 일정이 표시된 월간 달력" width="240"> | <img src="docs/images/event-add.jpg" alt="날짜, D-day, 색상을 고르는 일정 추가 시트" width="240"> |
 
 일정은 하루 또는 기간으로 넣고, 매년 반복과 D-day 를 켤 수 있습니다.
 D-day 를 켠 일정은 홈 화면 상단에 가까운 순서로 뜹니다.
