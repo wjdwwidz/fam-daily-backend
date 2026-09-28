@@ -42,15 +42,15 @@
 일정은 하루 또는 기간으로 넣고, 매년 반복과 D-day 를 켤 수 있습니다.
 D-day 를 켠 일정은 홈 화면 상단에 가까운 순서로 뜹니다.
 
-| 일상 | 일상 상세 | 댓글 · 답글 |
-|---|---|---|
-| <img src="docs/images/gallery.jpg" alt="가족별로 거를 수 있는 일상 사진 목록" width="240"> | <img src="docs/images/media.jpg" alt="날짜와 장소가 붙은 일상 글" width="240"> | <img src="docs/images/media-comments.jpg" alt="일상 글에 달린 댓글과 답글" width="240"> |
+| 일상 | 일상 상세 |
+|---|---|
+| <img src="docs/images/gallery.jpg" alt="가족별로 거를 수 있는 일상 사진 목록" width="240"> | <img src="docs/images/media.jpg" alt="날짜와 장소가 붙은 일상 글" width="240"> |
 
 사진 여러 장을 글 하나로 올리고, 찍은 날짜와 장소를 붙입니다.
 
-| 게시판 |
-|---|
-| <img src="docs/images/post.jpg" alt="생일 선물을 묻는 글과 가족들의 댓글" width="240"> |
+| 댓글 · 답글 | 게시판 |
+|---|---|
+| <img src="docs/images/media-comments.jpg" alt="일상 글에 달린 댓글과 답글" width="240"> | <img src="docs/images/post.jpg" alt="생일 선물을 묻는 글과 가족들의 댓글" width="240"> |
 
 > 스크린샷은 로컬 서버에 넣은 테스트 데이터로 찍었습니다. 가족과 글은 모두 가상이며,
 > 사진은 [Lorem Picsum](https://picsum.photos)(Unsplash 이미지)을 사용했습니다.
