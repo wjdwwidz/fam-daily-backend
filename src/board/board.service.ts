@@ -50,7 +50,12 @@ export class BoardService {
   }
 
   async getOne(userId: string, postId: string) {
-    const post = await this.mustPost(postId);
+    // 글쓴이까지 함께 — 화면이 '누가 썼는지'와 '내 글인지'를 보여준다
+    const post = await this.posts.findOne({
+      where: { id: postId },
+      relations: { author: { user: true } },
+    });
+    if (!post) throw new NotFoundException('글을 찾을 수 없습니다.');
     await this.assertMember(userId, post.groupId);
     const { count, comments } = await this.listComments(userId, postId);
     return { ...this.postJson(post, userId), commentCount: count, comments };
