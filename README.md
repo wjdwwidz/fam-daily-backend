@@ -21,17 +21,17 @@
 ## 화면
 이 API 로 동작하는 앱 화면입니다.
 
-| 홈 | 가족 사전 |
+| 홈 | 홈 (아래) |
 |---|---|
-| <img src="docs/images/home.jpg" alt="오늘의 한마디와 D-day, 최근 활동이 있는 홈 화면" width="240"> | <img src="docs/images/dict.jpg" alt="가나다순으로 정리된 가족 사전 화면" width="240"> |
+| <img src="docs/images/home.jpg" alt="가족들의 오늘의 한마디가 있는 홈 화면 위쪽" width="240"> | <img src="docs/images/home-bottom.jpg" alt="D-day 일정과 최근 활동이 있는 홈 화면 아래쪽" width="240"> |
 
 홈에서는 가족들의 오늘의 한마디, 다가오는 D-day, 최근 활동을 한 번에 봅니다.
+
+| 가족 사전 | 버킷리스트 | 빈 칸 채우기 |
+|---|---|---|
+| <img src="docs/images/dict.jpg" alt="가나다순으로 정리된 가족 사전 화면" width="240"> | <img src="docs/images/bucket.jpg" alt="10칸 중 3칸을 이룬 가족 버킷리스트" width="240"> | <img src="docs/images/bucket-add.jpg" alt="8번 칸에 하고 싶은 일을 적는 화면" width="240"> |
+
 사전에는 우리 가족만 쓰는 말이 가나다순으로 쌓입니다.
-
-| 버킷리스트 | 빈 칸 채우기 |
-|---|---|
-| <img src="docs/images/bucket.jpg" alt="10칸 중 3칸을 이룬 가족 버킷리스트" width="240"> | <img src="docs/images/bucket-add.jpg" alt="8번 칸에 하고 싶은 일을 적는 화면" width="240"> |
-
 버킷리스트는 빈 번호 칸을 골라 하고 싶은 일을 적습니다.
 이룬 칸은 체크하고 그날의 일상 글을 연결하면, 목록에 사진이 함께 붙습니다.
 
