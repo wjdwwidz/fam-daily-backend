@@ -42,9 +42,9 @@
 일정은 하루 또는 기간으로 넣고, 매년 반복과 D-day 를 켤 수 있습니다.
 D-day 를 켠 일정은 홈 화면 상단에 가까운 순서로 뜹니다.
 
-| 일상 | 일상 상세 |
-|---|---|
-| <img src="docs/images/gallery.jpg" alt="가족별로 거를 수 있는 일상 사진 목록" width="240"> | <img src="docs/images/media.jpg" alt="날짜와 장소가 붙은 일상 글" width="240"> |
+| 일상 | 일상 올리기 | 일상 상세 |
+|---|---|---|
+| <img src="docs/images/gallery.jpg" alt="가족별로 거를 수 있는 일상 사진 목록" width="240"> | <img src="docs/images/upload.jpg" alt="사진 3장과 설명, 날짜를 넣은 일상 올리기 화면" width="240"> | <img src="docs/images/media.jpg" alt="날짜와 장소가 붙은 일상 글" width="240"> |
 
 사진 여러 장을 글 하나로 올리고, 찍은 날짜와 장소를 붙입니다.
 
