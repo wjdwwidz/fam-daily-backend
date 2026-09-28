@@ -28,11 +28,19 @@
 홈에서는 가족들의 오늘의 한마디, 다가오는 D-day, 최근 활동을 한 번에 봅니다.
 사전에는 우리 가족만 쓰는 말이 가나다순으로 쌓입니다.
 
-| 버킷리스트 | 달력 |
-|---|---|
-| <img src="docs/images/bucket.jpg" alt="10칸 중 3칸을 이룬 가족 버킷리스트" width="240"> | <img src="docs/images/calendar.jpg" alt="가족 일정이 표시된 월간 달력" width="240"> |
+| 버킷리스트 | 빈 칸 채우기 | 채운 뒤 |
+|---|---|---|
+| <img src="docs/images/bucket.jpg" alt="10칸 중 3칸을 이룬 가족 버킷리스트" width="240"> | <img src="docs/images/bucket-add.jpg" alt="8번 칸에 하고 싶은 일을 적는 화면" width="240"> | <img src="docs/images/bucket-added.jpg" alt="8번 칸이 채워진 버킷리스트" width="240"> |
 
-버킷리스트는 번호 칸을 채우고, 이룬 칸에는 그날의 일상 사진이 붙습니다.
+버킷리스트는 빈 번호 칸을 골라 하고 싶은 일을 적습니다.
+이룬 칸은 체크하고 그날의 일상 글을 연결하면, 목록에 사진이 함께 붙습니다.
+
+| 달력 | 일정 추가 | 추가한 뒤 |
+|---|---|---|
+| <img src="docs/images/calendar.jpg" alt="가족 일정이 표시된 월간 달력" width="240"> | <img src="docs/images/event-add.jpg" alt="날짜, D-day, 색상을 고르는 일정 추가 시트" width="240"> | <img src="docs/images/event-added.jpg" alt="오늘 날짜에 새 일정이 표시된 달력" width="240"> |
+
+일정은 하루 또는 기간으로 넣고, 매년 반복과 D-day 를 켤 수 있습니다.
+D-day 를 켠 일정은 홈 화면 상단에 가까운 순서로 뜹니다.
 
 | 일상 | 일상 상세 | 댓글 · 답글 |
 |---|---|---|
