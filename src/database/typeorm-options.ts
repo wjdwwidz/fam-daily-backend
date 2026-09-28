@@ -13,8 +13,8 @@ import { BucketItem } from '../entities/bucket-item.entity';
 import { PlacesUsage } from '../entities/places-usage.entity';
 import { Event } from '../entities/event.entity';
 import { PendingUpload } from '../entities/pending-upload.entity';
-import { Question } from '../entities/question.entity';
-import { Answer } from '../entities/answer.entity';
+import { Post } from '../entities/post.entity';
+import { PostComment } from '../entities/post-comment.entity';
 
 // 앱(Nest)과 마이그레이션 CLI 가 같은 DB 설정을 쓰도록 한 곳에 모은다.
 //
@@ -28,7 +28,7 @@ export function typeOrmOptions(
   const common = {
     type: 'postgres' as const,
     entities: [
-      User, Group, Membership, Invite, Word, Question, Answer,
+      User, Group, Membership, Invite, Word, Post, PostComment,
       Media, MediaComment, PendingUpload, MoodLog, ProfileLog, BucketItem, PlacesUsage, Event,
     ],
     migrations: [join(__dirname, '..', 'migrations', `*.${ext}`)],

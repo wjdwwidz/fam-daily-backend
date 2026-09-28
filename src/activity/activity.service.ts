@@ -4,8 +4,8 @@ import { IsNull, Not, Repository } from 'typeorm';
 import { Word } from '../entities/word.entity';
 import { Media } from '../entities/media.entity';
 import { MediaComment } from '../entities/media-comment.entity';
-import { Question } from '../entities/question.entity';
-import { Answer } from '../entities/answer.entity';
+import { Post } from '../entities/post.entity';
+import { PostComment } from '../entities/post-comment.entity';
 import { Membership } from '../entities/membership.entity';
 import { BucketItem } from '../entities/bucket-item.entity';
 import { MoodLog } from '../entities/mood-log.entity';
@@ -13,8 +13,8 @@ import { MoodLog } from '../entities/mood-log.entity';
 export type ActivityType =
   | 'word'
   | 'media'
-  | 'question'
-  | 'answer'
+  | 'post'
+  | 'postComment'
   | 'comment'
   | 'bucket'
   | 'bucketDone'
@@ -29,8 +29,9 @@ export class ActivityService {
   constructor(
     @InjectRepository(Word) private readonly words: Repository<Word>,
     @InjectRepository(Media) private readonly media: Repository<Media>,
-    @InjectRepository(Question) private readonly questions: Repository<Question>,
-    @InjectRepository(Answer) private readonly answers: Repository<Answer>,
+    @InjectRepository(Post) private readonly posts: Repository<Post>,
+    @InjectRepository(PostComment)
+    private readonly postComments: Repository<PostComment>,
     @InjectRepository(MediaComment)
     private readonly comments: Repository<MediaComment>,
     @InjectRepository(Membership)
@@ -49,7 +50,7 @@ export class ActivityService {
     await this.assertMember(userId, groupId);
     const take = Math.min(Math.max(1, limit), MAX_ACTIVITY_LIMIT);
 
-    const [words, media, questions, answers, comments, bucket, bucketDone, moods] =
+    const [words, media, posts, postComments, comments, bucket, bucketDone, moods] =
       await Promise.all([
       this.words.find({
         where: { groupId },
@@ -63,16 +64,16 @@ export class ActivityService {
         order: { createdAt: 'DESC' },
         take,
       }),
-      this.questions.find({
+      this.posts.find({
         where: { groupId },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
-      // 답변은 질문을 거쳐 가족에 연결된다
-      this.answers.find({
-        where: { question: { groupId } },
-        relations: { author: { user: true }, question: true },
+      // 게시판 댓글 (내용을 지운 "삭제된 댓글"은 빼고)
+      this.postComments.find({
+        where: { groupId, deletedAt: IsNull() },
+        relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
@@ -110,10 +111,10 @@ export class ActivityService {
       ...media.map((m) =>
         this.item('media', m.id, m.id, m.caption, m.createdAt, m.author, m.items?.[0]?.url ?? m.photoUrl),
       ),
-      ...questions.map((q) => this.item('question', q.id, q.id, q.text, q.createdAt, q.author)),
-      // 답변은 '어느 질문에 답했는지'를 보여준다 → text 는 질문 내용, targetId 는 질문
-      ...answers.map((a) =>
-        this.item('answer', a.id, a.questionId, a.question?.text ?? '', a.createdAt, a.author),
+      ...posts.map((p) => this.item('post', p.id, p.id, p.text, p.createdAt, p.author)),
+      // 게시판 댓글은 댓글 내용을 보여주고, 누르면 그 글로 → targetId 는 글
+      ...postComments.map((c) =>
+        this.item('postComment', c.id, c.postId, c.text, c.createdAt, c.author),
       ),
       // 댓글은 댓글 내용을 보여주고, 누르면 그 일상 글로 → targetId 는 글
       ...comments.map((c) => this.item('comment', c.id, c.mediaId, c.text, c.createdAt, c.author)),

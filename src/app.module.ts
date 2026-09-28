@@ -6,7 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { GroupsModule } from './groups/groups.module';
 import { WordsModule } from './words/words.module';
 import { MediaModule } from './media/media.module';
-import { QnaModule } from './qna/qna.module';
+import { BoardModule } from './board/board.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { LegalModule } from './legal/legal.module';
 import { ActivityModule } from './activity/activity.module';
@@ -40,7 +40,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     GroupsModule,
     WordsModule,
     MediaModule,
-    QnaModule,
+    BoardModule,
     UploadsModule,
     LegalModule,
     ActivityModule,
