@@ -36,6 +36,8 @@ const USER_AGENT =
 
 // 같은 링크를 작성 화면에서 한 번, 저장할 때 한 번 읽지 않도록 잠깐 기억해 둔다
 const CACHE_TTL_MS = 60 * 60 * 1000;
+// 못 읽은 결과는 잠깐만 — 사이트의 일시적인 오류가 한 시간 동안 카드를 막지 않게
+const FAILED_TTL_MS = 60 * 1000;
 const CACHE_MAX = 300;
 
 // 본문에서 링크 찾기. 문장 끝의 마침표·괄호 같은 것은 주소에서 뺀다.
@@ -87,7 +89,8 @@ export class LinkPreviewService {
 
   async preview(url: string): Promise<LinkPreview> {
     const hit = this.cache.get(url);
-    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+    const ttl = hit?.value.title ? CACHE_TTL_MS : FAILED_TTL_MS;
+    if (hit && Date.now() - hit.at < ttl) return hit.value;
 
     let value: LinkPreview;
     try {
@@ -116,6 +119,8 @@ export class LinkPreviewService {
       naverBlogMobile(url) ?? url,
       HTML_TYPE,
     );
+    // naver.me 단축 주소도 여기서 지도 주소로 풀린다
+    if (isNaverMap(finalUrl)) return fetchNaverMap(url, finalUrl);
     return parsePreview(body, url, finalUrl);
   }
 }
@@ -187,6 +192,75 @@ function naverBlogMobile(url: string): string | null {
   }
 }
 
+// 네이버 지도는 화면을 스크립트로 그려서 HTML 에 제목이 없다 (기본 지도 그림만 있다).
+//  - 장소(가게·식당 등): 같은 장소의 모바일 플레이스 페이지에 이름·리뷰 수·대표 사진이 있다.
+//    이 페이지는 이름을 밝힌 봇 요청을 429 로 막아서, 여기만 일반 브라우저 이름으로 읽는다.
+//  - 지하철역·정류장·길찾기 등: 이름을 읽을 곳이 없어 '네이버 지도 · 지하철역' 처럼 종류만 적는다.
+const NAVER_MAP_IMAGE =
+  'https://ssl.pstatic.net/static/maps/assets/images/og-map-400x200.png';
+const BROWSER_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+function isNaverMap(url: string) {
+  try {
+    return ['map.naver.com', 'm.map.naver.com'].includes(
+      new URL(url).hostname.toLowerCase(),
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function fetchNaverMap(
+  url: string,
+  mapUrl: string,
+): Promise<LinkPreview> {
+  const path = new URL(mapUrl).pathname;
+  const placeId = /\/place\/(\d+)/.exec(path)?.[1];
+  if (placeId) {
+    try {
+      const { body, finalUrl } = await fetchLimited(
+        `https://m.place.naver.com/place/${placeId}/home`,
+        HTML_TYPE,
+        BROWSER_UA,
+      );
+      const p = parsePreview(body, url, finalUrl);
+      if (p.title) {
+        return {
+          ...p,
+          title: p.title.replace(/\s*:\s*네이버$/, ''),
+          siteName: '네이버 지도',
+        };
+      }
+    } catch {
+      // 못 읽으면 아래의 종류만 적은 카드로
+    }
+  }
+  return {
+    url,
+    title: '네이버 지도',
+    description: naverMapKind(path),
+    image: NAVER_MAP_IMAGE,
+    siteName: '네이버 지도',
+  };
+}
+
+function naverMapKind(path: string): string {
+  if (/subway-station/.test(path)) return '지하철역';
+  if (/bus-station/.test(path)) return '버스 정류장';
+  if (/directions/.test(path)) return '길찾기';
+  if (/\/place\//.test(path)) return '장소';
+  const q = /\/search\/([^/]+)/.exec(path)?.[1];
+  if (q) {
+    try {
+      return `'${cut(decodeURIComponent(q), 30)}' 검색`;
+    } catch {
+      return '장소 검색';
+    }
+  }
+  return '지도';
+}
+
 // ── 안전하게 읽기 ─────────────────────────────────────────────────────
 
 const HTML_TYPE = /text\/html|application\/xhtml/i;
@@ -194,10 +268,11 @@ const HTML_TYPE = /text\/html|application\/xhtml/i;
 async function fetchLimited(
   url: string,
   typeRe: RegExp,
+  userAgent = USER_AGENT,
 ): Promise<{ body: string; finalUrl: string }> {
   let current = url;
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    const res = await get(current);
+    const res = await get(current, userAgent);
     const status = res.statusCode ?? 0;
     if (status >= 300 && status < 400 && res.headers.location) {
       res.resume();
@@ -219,7 +294,7 @@ async function fetchLimited(
   throw new Error('리다이렉트가 너무 많음');
 }
 
-function get(url: string): Promise<IncomingMessage> {
+function get(url: string, userAgent: string): Promise<IncomingMessage> {
   const u = new URL(url);
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
     return Promise.reject(new Error('http/https 만 허용'));
@@ -244,7 +319,7 @@ function get(url: string): Promise<IncomingMessage> {
         lookup: safeLookup,
         timeout: TIMEOUT_MS,
         headers: {
-          'User-Agent': USER_AGENT,
+          'User-Agent': userAgent,
           Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
           'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.6',
           'Accept-Encoding': 'gzip, deflate, br',
@@ -400,7 +475,14 @@ function attr(tag: string, name: string): string | null {
 }
 
 function clean(s: string): string {
-  return decodeEntities(s).replace(/\s+/g, ' ').trim();
+  // 보이지 않는 제어 문자는 뺀다 (네이버 플레이스 제목 끝에 붙어 온다)
+  return (
+    decodeEntities(s)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function cut(s: string | null, max: number): string | null {
