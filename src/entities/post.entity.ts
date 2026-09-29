@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { LinkPreview } from '../links/link-preview.service';
 import { Group } from './group.entity';
 import { Membership } from './membership.entity';
 import { PostComment } from './post-comment.entity';
@@ -21,6 +22,10 @@ export class Post {
 
   @Column({ type: 'text' })
   text: string;
+
+  // 본문에 붙인 링크의 카드 정보 (본문 순서대로). 저장할 때 읽어 두어 글을 열 때마다 다시 읽지 않는다.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  links: LinkPreview[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

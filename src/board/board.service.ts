@@ -17,6 +17,7 @@ import {
   UpdatePostCommentDto,
   UpdatePostDto,
 } from './dto/board.dto';
+import { extractUrls, LinkPreviewService } from '../links/link-preview.service';
 
 // 가족 게시판.
 //  - 가족 구성원만 보고 쓴다
@@ -30,6 +31,7 @@ export class BoardService {
     private readonly comments: Repository<PostComment>,
     @InjectRepository(Membership)
     private readonly memberships: Repository<Membership>,
+    private readonly linkPreviews: LinkPreviewService,
   ) {}
 
   // ── 글 ────────────────────────────────────────────────────────────
@@ -63,9 +65,11 @@ export class BoardService {
 
   async create(userId: string, groupId: string, dto: CreatePostDto) {
     const me = await this.assertMember(userId, groupId);
+    const text = this.cleanText(dto.text, MAX_POST_LENGTH, '글');
     const saved = await this.posts.save(
       this.posts.create({
-        text: this.cleanText(dto.text, MAX_POST_LENGTH, '글'),
+        text,
+        links: await this.linkPreviews.previewAll(extractUrls(text)),
         groupId,
         authorId: me.id,
       }),
@@ -76,6 +80,11 @@ export class BoardService {
   async update(userId: string, postId: string, dto: UpdatePostDto) {
     const post = await this.mustOwnPost(userId, postId);
     post.text = this.cleanText(dto.text, MAX_POST_LENGTH, '글');
+    // 그대로 남은 링크는 전에 읽어 둔 카드를 쓰고, 새로 넣은 링크만 읽는다
+    post.links = await this.linkPreviews.previewAll(
+      extractUrls(post.text),
+      post.links ?? [],
+    );
     await this.posts.save(post);
     return this.getOne(userId, postId);
   }
@@ -106,7 +115,8 @@ export class BoardService {
       }));
     const byId = new Map(roots.map((r) => [r.id, r]));
     for (const c of rows) {
-      if (c.parentId) byId.get(c.parentId)?.replies.push(this.commentJson(c, userId));
+      if (c.parentId)
+        byId.get(c.parentId)?.replies.push(this.commentJson(c, userId));
     }
     return {
       // 지워지지 않은 댓글·답글 수
@@ -125,7 +135,8 @@ export class BoardService {
       const parent = await this.comments.findOne({
         where: { id: dto.parentId, postId },
       });
-      if (!parent) throw new NotFoundException('답글을 달 댓글을 찾을 수 없습니다.');
+      if (!parent)
+        throw new NotFoundException('답글을 달 댓글을 찾을 수 없습니다.');
       // 답글에 답하면 같은 최상위 댓글 아래로 (한 단계까지만)
       parentId = parent.parentId ?? parent.id;
     }
@@ -172,7 +183,10 @@ export class BoardService {
       // 마지막 답글이 지워졌고 부모가 이미 "삭제된 댓글"이면 부모도 정리
       if (parentId) {
         const parent = await this.comments.findOne({ where: { id: parentId } });
-        if (parent?.deletedAt && !(await this.comments.existsBy({ parentId }))) {
+        if (
+          parent?.deletedAt &&
+          !(await this.comments.existsBy({ parentId }))
+        ) {
           await this.comments.remove(parent);
         }
       }
@@ -248,6 +262,8 @@ export class BoardService {
     return {
       id: p.id,
       text: p.text,
+      // 본문의 링크 카드 (본문 순서대로). 화면은 본문에서 이 주소가 있던 자리에 카드를 끼운다.
+      links: p.links ?? [],
       createdAt: p.createdAt,
       // 저장 직후의 미세한 차이는 수정으로 보지 않는다
       edited: p.updatedAt.getTime() - p.createdAt.getTime() > 1000,
