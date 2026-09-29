@@ -1,8 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 // 글은 길게, 댓글은 짧게 (일상 댓글과 같은 한도)
 export const MAX_POST_LENGTH = 2000;
+export const MAX_POST_TITLE_LENGTH = 60;
+// 공지로 올려둘 수 있는 글 수
+export const MAX_PINNED_POSTS = 3;
 export const MAX_POST_COMMENT_LENGTH = 300;
 
 export class CreatePostDto {
@@ -10,6 +19,20 @@ export class CreatePostDto {
   @IsString()
   @MaxLength(MAX_POST_LENGTH)
   text: string;
+
+  @ApiPropertyOptional({
+    example: '김장 날짜 안내',
+    description: '공지로 올릴 때의 제목',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_POST_TITLE_LENGTH)
+  title?: string | null;
+
+  @ApiPropertyOptional({ example: false, description: '공지로 올릴지' })
+  @IsOptional()
+  @IsBoolean()
+  pinned?: boolean;
 }
 
 export class UpdatePostDto {
@@ -17,6 +40,23 @@ export class UpdatePostDto {
   @IsString()
   @MaxLength(MAX_POST_LENGTH)
   text: string;
+
+  @ApiPropertyOptional({ example: '김장 날짜 안내', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_POST_TITLE_LENGTH)
+  title?: string | null;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  pinned?: boolean;
+}
+
+export class PinPostDto {
+  @ApiProperty({ example: true, description: '켜면 공지, 끄면 보통 글' })
+  @IsBoolean()
+  pinned: boolean;
 }
 
 export class CreatePostCommentDto {
