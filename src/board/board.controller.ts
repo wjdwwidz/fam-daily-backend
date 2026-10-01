@@ -9,7 +9,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
 import { BoardService } from './board.service';
@@ -17,6 +22,7 @@ import {
   CreatePostCommentDto,
   CreatePostDto,
   UpdatePostCommentDto,
+  PinPostDto,
   UpdatePostDto,
 } from './dto/board.dto';
 
@@ -30,17 +36,24 @@ export class BoardController {
 
   @Get('groups/:groupId/posts')
   @ApiOperation({ summary: '가족 게시판 글 목록 (최신순)' })
-  @ApiQuery({ name: 'limit', required: false, example: 30 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: '앞 쪽 응답의 nextCursor — 그보다 오래된 글부터 준다',
+  })
   list(
     @CurrentUser() user: AuthUser,
     @Param('groupId') groupId: string,
     @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
     const n = Number(limit);
     return this.board.list(
       user.id,
       groupId,
-      Number.isFinite(n) && n > 0 ? Math.floor(n) : 30,
+      Number.isFinite(n) && n > 0 ? Math.floor(n) : 20,
+      cursor,
     );
   }
 
@@ -52,6 +65,16 @@ export class BoardController {
     @Body() dto: CreatePostDto,
   ) {
     return this.board.create(user.id, groupId, dto);
+  }
+
+  @Patch('posts/:postId/pin')
+  @ApiOperation({ summary: '공지로 올리기·내리기 (가족 누구나, 3개까지)' })
+  setPinned(
+    @CurrentUser() user: AuthUser,
+    @Param('postId') postId: string,
+    @Body() dto: PinPostDto,
+  ) {
+    return this.board.setPinned(user.id, postId, dto.pinned);
   }
 
   @Get('posts/:postId')

@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { LinkPreview } from '../links/link-preview.service';
 import { Group } from './group.entity';
 import { Membership } from './membership.entity';
 import { PostComment } from './post-comment.entity';
@@ -19,8 +20,20 @@ export class Post {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  // 공지로 올린 글만 제목을 단다 (평소 글은 내용만)
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  title: string | null;
+
   @Column({ type: 'text' })
   text: string;
+
+  // 공지로 올린 시각. 비어 있으면 보통 글. 공지는 목록 맨 위에 최근에 올린 순으로 선다.
+  @Column({ type: 'timestamptz', nullable: true })
+  pinnedAt: Date | null;
+
+  // 본문에 붙인 링크의 카드 정보 (본문 순서대로). 저장할 때 읽어 두어 글을 열 때마다 다시 읽지 않는다.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  links: LinkPreview[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
