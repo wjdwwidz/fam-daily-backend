@@ -15,6 +15,8 @@ import { Event } from '../entities/event.entity';
 import { PendingUpload } from '../entities/pending-upload.entity';
 import { Post } from '../entities/post.entity';
 import { PostComment } from '../entities/post-comment.entity';
+import { MonthlySummary } from '../entities/monthly-summary.entity';
+import { LlmUsage } from '../entities/llm-usage.entity';
 
 // 앱(Nest)과 마이그레이션 CLI 가 같은 DB 설정을 쓰도록 한 곳에 모은다.
 //
@@ -30,6 +32,7 @@ export function typeOrmOptions(
     entities: [
       User, Group, Membership, Invite, Word, Post, PostComment,
       Media, MediaComment, PendingUpload, MoodLog, ProfileLog, BucketItem, PlacesUsage, Event,
+      MonthlySummary, LlmUsage,
     ],
     migrations: [join(__dirname, '..', 'migrations', `*.${ext}`)],
     synchronize: false,

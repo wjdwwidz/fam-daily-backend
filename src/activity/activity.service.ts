@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { Between, IsNull, Not, Repository } from 'typeorm';
 import { Word } from '../entities/word.entity';
 import { Media } from '../entities/media.entity';
 import { MediaComment } from '../entities/media-comment.entity';
@@ -50,56 +50,76 @@ export class ActivityService {
     await this.assertMember(userId, groupId);
     const take = Math.min(Math.max(1, limit), MAX_ACTIVITY_LIMIT);
 
+    return this.collect(groupId, take);
+  }
+
+  // 한 기간(from 이상 to 미만)의 활동 — 월간 요약이 읽는다. 구성원 확인은 부르는 쪽이 한다.
+  // 종류마다 최신 cap 개까지만 읽어, 기록이 아주 많은 달에도 한 번에 읽는 양이 정해져 있다.
+  async between(groupId: string, from: Date, to: Date, cap = MAX_ACTIVITY_LIMIT) {
+    return this.collect(groupId, Math.max(1, cap), { from, to });
+  }
+
+  private async collect(
+    groupId: string,
+    take: number,
+    range?: { from: Date; to: Date },
+  ) {
+    // to 는 포함하지 않는다 (다음 달 1일 0시는 다음 달)
+    const inRange = range
+      ? Between(range.from, new Date(range.to.getTime() - 1))
+      : undefined;
+    const at = inRange ? { createdAt: inRange } : {};
+
     const [words, media, posts, postComments, comments, bucket, bucketDone, moods] =
       await Promise.all([
       this.words.find({
-        where: { groupId },
+        where: { groupId, ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       this.media.find({
-        where: { groupId },
+        where: { groupId, ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       this.posts.find({
-        where: { groupId },
+        where: { groupId, ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       // 게시판 댓글 (내용을 지운 "삭제된 댓글"은 빼고)
       this.postComments.find({
-        where: { groupId, deletedAt: IsNull() },
+        where: { groupId, deletedAt: IsNull(), ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       // 일상 댓글 (내용을 지운 "삭제된 댓글"은 빼고)
       this.comments.find({
-        where: { groupId, deletedAt: IsNull() },
+        where: { groupId, deletedAt: IsNull(), ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       // 버킷리스트에 새로 적은 칸
       this.bucket.find({
-        where: { groupId },
+        where: { groupId, ...at },
         relations: { createdBy: { user: true } },
         order: { createdAt: 'DESC' },
         take,
       }),
       // 달성한 칸 — 누가 눌렀는지는 보여주지 않는다 (가족이 함께 이룬 일이므로)
       this.bucket.find({
-        where: { groupId, doneAt: Not(IsNull()) },
+        where: { groupId, doneAt: inRange ?? Not(IsNull()) },
         order: { doneAt: 'DESC' },
         take,
       }),
       // 오늘의 한마디 — 바꿀 때마다 쌓이는 mood_log 에서 (지금 상태가 아니라 남긴 순간)
       this.moods.find({
-        where: { groupId },
+        where: { groupId, ...at },
         relations: { author: { user: true } },
         order: { createdAt: 'DESC' },
         take,
