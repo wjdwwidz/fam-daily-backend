@@ -3,7 +3,7 @@ import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, MoreThan, MoreThanOrEqual, Repository } from 'typeorm';
+import { LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Repository } from 'typeorm';
 import { ActivityService, type ActivityType } from '../activity/activity.service';
 import { Group } from '../entities/group.entity';
 import { LlmUsage, type LlmUsageStatus } from '../entities/llm-usage.entity';
@@ -98,13 +98,22 @@ export class SummaryService {
   // 지난 요약 모아보기 (알림 화면) — 활동이 있던 달만, 최근 달부터
   async history(userId: string, groupId: string, limit = 12, now = new Date()) {
     await this.assertMember(userId, groupId);
+    const current = monthOf(now);
+    // 끝난 달만 보여준다. 로컬에서 이번 달을 테스트로 만들어 확인할 때만
+    // SUMMARY_SHOW_CURRENT_MONTH=true 로 이번 달도 넣는다 (배포 환경에는 두지 않는다)
+    const showCurrent = this.config.get<string>('SUMMARY_SHOW_CURRENT_MONTH') === 'true';
     const rows = await this.summaries.find({
-      // 끝난 달만 (이번 달은 테스트로 만들었더라도 빼고)
-      where: { groupId, activityCount: MoreThan(0), month: LessThan(monthOf(now)) },
+      where: {
+        groupId,
+        activityCount: MoreThan(0),
+        month: showCurrent ? LessThanOrEqual(current) : LessThan(current),
+      },
       order: { month: 'DESC' },
       take: Math.min(Math.max(1, limit), 36),
     });
-    return { items: rows.map((r) => this.view(r, false)) };
+    return {
+      items: rows.map((r) => ({ ...this.view(r, false), inProgress: r.month === current })),
+    };
   }
 
   private view(s: MonthlySummary, isPreviousMonth: boolean) {

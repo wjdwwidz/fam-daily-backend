@@ -22,7 +22,7 @@ const item = (over: Partial<any> = {}) => ({
   ...over,
 });
 
-function setup(opts: { items?: any[]; existing?: any; generatedToday?: number; llm?: any; configured?: boolean } = {}) {
+function setup(opts: { items?: any[]; existing?: any; generatedToday?: number; llm?: any; configured?: boolean; env?: Record<string, string> } = {}) {
   const summaries = {
     findOne: jest.fn().mockResolvedValue(opts.existing ?? null),
     find: jest.fn().mockResolvedValue([]),
@@ -41,7 +41,7 @@ function setup(opts: { items?: any[]; existing?: any; generatedToday?: number; l
       opts.llm ??
       jest.fn().mockResolvedValue({ text: '이번 달엔 김밥을 쌌어요.', model: 'claude-haiku-4-5', inputTokens: 500, outputTokens: 80 }),
   };
-  const config = { get: jest.fn().mockReturnValue(undefined) };
+  const config = { get: jest.fn((k: string) => opts.env?.[k]) };
   const svc = new SummaryService(
     summaries as any, usage as any, groups as any, memberships as any,
     activity as any, llm as any, config as any,
@@ -222,5 +222,23 @@ describe('지난 요약 모아보기', () => {
     const where = summaries.find.mock.calls[0][0].where;
     expect(where.groupId).toBe('g1');
     expect(summaries.find.mock.calls[0][0].order).toEqual({ month: 'DESC' });
+  });
+});
+
+describe('로컬에서 이번 달 요약 확인', () => {
+  const now = new Date('2026-11-24T01:00:00Z');
+  it('기본은 끝난 달만 (이번 달 제외)', async () => {
+    const { svc, summaries } = setup();
+    await svc.history('u1', 'g1', 12, now);
+    const month = summaries.find.mock.calls[0][0].where.month;
+    expect(month._type).toBe('lessThan');
+    expect(month._value).toBe('2026-11');
+  });
+  it('SUMMARY_SHOW_CURRENT_MONTH=true 면 이번 달도 넣고, 진행 중 표시를 붙인다', async () => {
+    const { svc, summaries } = setup({ env: { SUMMARY_SHOW_CURRENT_MONTH: 'true' } });
+    summaries.find.mockResolvedValue([{ month: '2026-11', text: '11월', activityCount: 1, updatedAt: now }]);
+    const res = await svc.history('u1', 'g1', 12, now);
+    expect(summaries.find.mock.calls[0][0].where.month._type).toBe('lessThanOrEqual');
+    expect(res.items[0]).toMatchObject({ month: '2026-11', inProgress: true });
   });
 });
