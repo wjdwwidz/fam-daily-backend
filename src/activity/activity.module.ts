@@ -18,5 +18,6 @@ import { MoodLog } from '../entities/mood-log.entity';
     ])],
   controllers: [ActivityController],
   providers: [ActivityService],
+  exports: [ActivityService],
 })
 export class ActivityModule {}

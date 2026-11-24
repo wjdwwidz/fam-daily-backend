@@ -14,6 +14,7 @@ import { BucketModule } from './bucket/bucket.module';
 import { PlacesModule } from './places/places.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { SummaryModule } from './summary/summary.module';
 import { AppController } from './app.controller';
 import { typeOrmOptions } from './database/typeorm-options';
 
@@ -48,6 +49,7 @@ import { typeOrmOptions } from './database/typeorm-options';
     PlacesModule,
     NotificationsModule,
     CalendarModule,
+    SummaryModule,
   ],
   controllers: [AppController],
 })
